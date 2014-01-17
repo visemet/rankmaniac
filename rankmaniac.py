@@ -1,4 +1,4 @@
-'''Simple Amazon Web Services Wrapper 
+'''Simple Amazon Web Services Wrapper
 
 Written for
     Rankmaniac 2013
@@ -52,13 +52,13 @@ class Rankmaniac:
         if self.job_id:
             self.terminate_job()
 
-    def submit_job(self, mapper, reducer, input, output, num_map=1, 
+    def submit_job(self, mapper, reducer, input, output, num_map=1,
                    num_reduce=1):
         '''Submit a new MapReduce job
 
         Submits a new MapReduce job with a single step. To add more steps,
         call add_step. To terminate this job, call terminate_job.
-        
+
         Arguments:
             mapper          string      path to the mapper, relative to
                                         your data directory.
@@ -75,9 +75,9 @@ class Rankmaniac:
 
         if self.job_id:
             raise Exception('There currently already exists a running job.')
-        
+
         job_name = self._make_name()
-        step = self._make_step(mapper, reducer, input, output, num_map, 
+        step = self._make_step(mapper, reducer, input, output, num_map,
                                num_reduce)
         self.job_id = \
           self.emr_conn.run_jobflow(name=job_name,
@@ -118,13 +118,13 @@ class Rankmaniac:
               call this function; we have had success with calling it one
               every 10 seconds.
         '''
-        
+
         if not self.job_id:
             raise Exception('No job is running.')
 
         return self.emr_conn.describe_jobflow(self.job_id)
 
-    def add_step(self, mapper, reducer, input, output, num_map=1, 
+    def add_step(self, mapper, reducer, input, output, num_map=1,
                  num_reduce=1):
         '''Add a step to an existing job
 
@@ -133,7 +133,7 @@ class Rankmaniac:
         Note: any given job flow can support up to 256 steps. To workaround
               this limitation, you can always choose to submit a new job
               once the current job completes.
-        
+
         Arguments:
             mapper          string      path to the mapper, relative to
                                         your data directory.
@@ -152,7 +152,7 @@ class Rankmaniac:
         step = self._make_step(mapper, reducer, input, output, num_map,
                                num_reduce)
         self.emr_conn.add_jobflow_steps(self.job_id, [step])
-    
+
     def upload(self, in_dir='data'):
         '''Upload local data to S3
 
@@ -167,11 +167,11 @@ class Rankmaniac:
                                         this directory as the base directory
                                         from which to upload.
         '''
-        
+
         bucket = self.s3_conn.get_bucket(self.s3_bucket)
         keys = bucket.list(prefix='%s/' % self.team_id)
         bucket.delete_keys(map(lambda k: k.name, keys))
-        
+
         to_upload = [
             (os.path.join(in_dir, file_name),
              os.path.join(self.team_id, file_name))
@@ -210,9 +210,9 @@ class Rankmaniac:
     def _make_name(self):
 
         return '%s-%s' % (self.team_id,
-                          strftime('%m-%d-%Y %H:%M:%s', localtime()))
+                          strftime('%m-%d-%Y %H:%M:%S', localtime()))
 
-    
+
     def _make_step(self, mapper, reducer, input, output, nm=1, nr=1):
 
         job_name = self._make_name()
