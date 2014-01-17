@@ -12,6 +12,8 @@ Author
 import os
 from time import localtime, strftime
 
+import boto
+
 # Amazon SDK for Elastic Map Reduce
 from boto.emr.connection import EmrConnection
 from boto.emr.step import StreamingStep
@@ -28,7 +30,8 @@ class Rankmaniac:
     so students don't need to worry about learning the EMR and S3 API.
     '''
 
-    def __init__(self, team_id, access_key, secret_key):
+    def __init__(self, team_id, access_key, secret_key,
+                 bucket='cs144caltech'):
         '''Rankmaniac class constructor
 
         Creates a new instance of the Rankmaniac Wrapper for a specific
@@ -40,7 +43,12 @@ class Rankmaniac:
             secret_key      string      AWS secret key.
         '''
 
-        self.s3_bucket = 'cs144caltech'
+
+        boto.config.set('Boto', 'emr_region_name', 'us-west-2')
+        boto.config.set('Boto', 'emr_region_endpoint',
+                        'elasticmapreduce.us-west-2.amazonaws.com')
+
+        self.s3_bucket = bucket
 
         self.team_id = team_id
         self.emr_conn = EmrConnection(access_key, secret_key)
