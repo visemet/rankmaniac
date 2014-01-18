@@ -55,10 +55,74 @@ class Rankmaniac:
         self.s3_conn = S3Connection(access_key, secret_key)
         self.job_id = None
 
+        self._iter_no = 0
+        self._infile = None
+        self._last_outdir = None
+
     def __del__(self):
 
         if self.job_id:
             self.terminate_job()
+
+    def set_input_file(self, filename):
+        """
+        TODO: document
+        """
+
+        self._infile = filename
+
+    def do_iter(self, pagerank_mapper, pagerank_reducer,
+                process_mapper, process_reducer,
+                pagerank_output=None, process_output=None,
+                num_pagerank_mappers=1, num_pagerank_reducers=1):
+        """
+        Adds a pagerank step and a process step to the current job.
+        """
+
+        if not self.job_id:
+            raise Exception('No job is running.')
+
+        num_process_mappers = 1
+        num_process_reducers = 1
+
+        if self._iter_no == 0:
+            pagerank_input = self._infile
+        elif self._iter_no > 0:
+            pagerank_input = self._last_outdir
+
+        if pagerank_output is None:
+            pagerank_output = self._get_default_outdir('pagerank')
+
+        # Output from the pagerank step becomes input to process step
+        process_input = pagerank_output
+
+        if process_output is None:
+            process_output = self._get_default_outdir('process')
+
+        pagerank_step = self._make_step(pagerank_mapper, pagerank_reducer,
+                                        pagerank_input, pagerank_output,
+                                        num_pagerank_mappers,
+                                        num_pagerank_reducers)
+
+        process_step = self._make_step(process_mapper, process_reducer,
+                                       process_input, process_output,
+                                       num_process_mappers,
+                                       num_process_reducers)
+
+        self.emr_conn.add_jobflow_steps(self.job_id, [pagerank_step,
+                                                      process_step])
+
+        # Store `process_output` directory so it can be used in
+        # subsequent iteration
+        self._last_outdir = process_output
+
+    def _get_default_outdir(self, name):
+        """
+        TODO: document
+        """
+
+        # Return job_id/iter_no/name/ **with** the trailing slash
+        return os.path.join(self.job_id, self._iter_no, name, '')
 
     def submit_job(self, mapper, reducer, input, output, num_map=1,
                    num_reduce=1):
