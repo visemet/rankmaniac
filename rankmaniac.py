@@ -1,13 +1,13 @@
-'''Simple Amazon Web Services Wrapper
+"""
+Simple wrapper for boto library to connect with AWS.
 
-Written for
-    Rankmaniac 2013
-    CS 144: Ideas behind the Web
-    California Institute of Technology
+Written for the Rankmaniac competition (2013-2014)
+in CS/EE 144: Ideas behind our Networked World
+at the California Institute of Technology.
 
-Author
-    Joe Wang
-'''
+Authored by: Joe Wang (me@joewang.net)
+Edited by: Max Hirschhorn (maxh@caltech.edu)
+"""
 
 import os
 from time import localtime, strftime
@@ -25,28 +25,38 @@ from boto.s3.key import Key
 
 
 class Rankmaniac:
-    '''Rankmaniac Wrapper
+    """
+    (wrapper class)
 
-    This class provides a simple wrapper around the Amazon Web Services SDK.
-    It should provide all the functionality required in terms of MapReduce,
-    so students don't need to worry about learning the EMR and S3 API.
-    '''
+    This class presents a simple wrapper around the AWS SDK. It strives
+    to provide all the functionality required to run map-reduce
+    (Hadoop) on Amazon. This way the students do not need to worry about
+    learning the API for Amazon S3 and EMR, and instead can focus on
+    computing pagerank quickly!
+    """
 
     DefaultRegionName = 'us-west-2'
     DefaultRegionEndpoint = 'elasticmapreduce.us-west-2.amazonaws.com'
 
     def __init__(self, team_id, access_key, secret_key,
                  bucket='cs144caltech'):
-        '''Rankmaniac class constructor
+        """
+        (constructor)
 
-        Creates a new instance of the Rankmaniac Wrapper for a specific
-        team.
+        Creates a new instance of the Rankmaniac class for a specific
+        team using the provided credentials.
 
         Arguments:
-            team_id         string      the team ID.
-            access_key      string      AWS access key.
-            secret_key      string      AWS secret key.
-        '''
+            team_id       <str>     the team identifier, which may be
+                                    differ slightly from the actual team
+                                    name.
+
+            access_key    <str>     the AWS access key identifier.
+            secret_key    <str>     the AWS secret acess key.
+
+        Keyword arguments:
+            bucket        <str>     the S3 bucket name.
+        """
 
         region = RegionInfo(None, self.DefaultRegionName,
                             self.DefaultRegionEndpoint)
