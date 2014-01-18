@@ -198,40 +198,6 @@ class Rankmaniac:
 
         return i / 2 - 1
 
-    def submit_job(self, mapper, reducer, input, output, num_map=1,
-                   num_reduce=1):
-        '''Submit a new MapReduce job
-
-        Submits a new MapReduce job with a single step. To add more steps,
-        call add_step. To terminate this job, call terminate_job.
-
-        Arguments:
-            mapper          string      path to the mapper, relative to
-                                        your data directory.
-            reducer         string      path to the reducer, relative to
-                                        your data directory.
-            input           string      path to the input data, relative to
-                                        your data directory. To specify a
-                                        directory as input, ensure your path
-                                        contains a trailing /.
-            output          string      path to the desired output directory.
-            num_map         int         number of map tasks for this job.
-            num_reduce      int         number of reduce tasks for this job.
-        '''
-
-        if self.job_id:
-            raise Exception('There currently already exists a running job.')
-
-        job_name = self._make_name()
-        step = self._make_step(mapper, reducer, input, output, num_map,
-                               num_reduce)
-        self.job_id = \
-          self.emr_conn.run_jobflow(name=job_name,
-                                    steps=[step],
-                                    num_instances=1,
-                                    log_uri=self._get_s3_url() + 'job_logs',
-                                    keep_alive=True)
-
     def terminate_job(self):
         '''Terminate a running MapReduce job
 
@@ -269,35 +235,6 @@ class Rankmaniac:
             raise Exception('No job is running.')
 
         return self.emr_conn.describe_jobflow(self.job_id)
-
-    def add_step(self, mapper, reducer, input, output, num_map=1,
-                 num_reduce=1):
-        '''Add a step to an existing job
-
-        Adds a new step to an already running job flow.
-
-        Note: any given job flow can support up to 256 steps. To workaround
-              this limitation, you can always choose to submit a new job
-              once the current job completes.
-
-        Arguments:
-            mapper          string      path to the mapper, relative to
-                                        your data directory.
-            reducer         string      path to the reducer, relative to
-                                        your data directory.
-            input           string      path to the input data, relative to
-                                        your data directory. To specify a
-                                        directory as input, ensure your path
-                                        contains a trailing /.
-            output          string      path to the desired output directory.
-        '''
-
-        if not self.job_id:
-            raise Exception('No job is running.')
-
-        step = self._make_step(mapper, reducer, input, output, num_map,
-                               num_reduce)
-        self.emr_conn.add_jobflow_steps(self.job_id, [step])
 
     def upload(self, in_dir='data'):
         '''Upload local data to S3
