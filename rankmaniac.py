@@ -48,7 +48,7 @@ class Rankmaniac:
             secret_key      string      AWS secret key.
         '''
 
-        region = RegionInfo(self, self.DefaultRegionName,
+        region = RegionInfo(None, self.DefaultRegionName,
                             self.DefaultRegionEndpoint)
 
         self.s3_bucket = bucket
@@ -121,13 +121,17 @@ class Rankmaniac:
         self._last_outdir = process_output
         self._iter_no += 1
 
-    def _get_default_outdir(self, name):
+    def _get_default_outdir(self, name, iter_no=None):
         """
         TODO: document
         """
 
+        if iter_no is None:
+            iter_no = self._iter_no
+        iter_no = str(iter_no)
+
         # Return iter_no/name/ **with** the trailing slash
-        return os.path.join(str(self._iter_no), name, '')
+        return os.path.join(iter_no, name, '')
 
     def _submit_new_job(self, steps):
         """
@@ -144,6 +148,45 @@ class Rankmaniac:
                                                 num_instances=1,
                                                 log_uri=log_uri,
                                                 keep_alive=True)
+
+    def is_done(self):
+        """
+        Gets the first part of the output file and checks whether it
+        contains FinalRank
+
+        REVIEW: requires that the default output directory is used
+        """
+
+        iter_no = self._get_last_process_step_iter_no()
+        if iter_no < 0:
+            return False
+
+        outdir = self._get_default_outdir('process', iter_no=iter_no)
+        keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
+
+        bucket = self.s3_conn.get_bucket(self.s3_bucket)
+        key = Key(bucket=bucket, name=keyname)
+        contents = key.next()
+
+        return contents.startswith('FinalRank')
+
+    def _get_last_process_step_iter_no(self):
+        """
+        Returns the most recently process-step of the job flow that has
+        been completed.
+        """
+
+        steps = self.get_job().steps
+        i = 1
+
+        while i < len(steps):
+            step = steps[i]
+            if step.state != 'COMPLETED':
+                break
+
+            i += 2
+
+        return i / 2 - 1
 
     def submit_job(self, mapper, reducer, input, output, num_map=1,
                    num_reduce=1):
