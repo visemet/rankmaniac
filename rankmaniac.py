@@ -79,8 +79,6 @@ class Rankmaniac:
         Adds a pagerank step and a process step to the current job.
         """
 
-        if not self.job_id:
-            raise Exception('No job is running.')
 
         num_process_mappers = 1
         num_process_reducers = 1
@@ -109,20 +107,40 @@ class Rankmaniac:
                                        num_process_mappers,
                                        num_process_reducers)
 
-        self.emr_conn.add_jobflow_steps(self.job_id, [pagerank_step,
-                                                      process_step])
+        steps = [pagerank_step, process_step]
+        if self.job_id is None:
+            self._submit_new_job(steps)
+        else:
+            self.emr_conn.add_jobflow_steps(self.job_id, steps)
 
         # Store `process_output` directory so it can be used in
         # subsequent iteration
         self._last_outdir = process_output
+        self._iter_no += 1
 
     def _get_default_outdir(self, name):
         """
         TODO: document
         """
 
-        # Return job_id/iter_no/name/ **with** the trailing slash
-        return os.path.join(self.job_id, self._iter_no, name, '')
+        # Return iter_no/name/ **with** the trailing slash
+        return os.path.join(str(self._iter_no), name, '')
+
+    def _submit_new_job(self, steps):
+        """
+        TODO: document
+        """
+
+        if self.job_id:
+            raise Exception('There currently already exists a running job.')
+
+        job_name = self._make_name()
+        log_uri = self._get_s3_url() + 'job_logs'
+        self.job_id = self.emr_conn.run_jobflow(name=job_name,
+                                                steps=steps,
+                                                num_instances=1,
+                                                log_uri=log_uri,
+                                                keep_alive=True)
 
     def submit_job(self, mapper, reducer, input, output, num_map=1,
                    num_reduce=1):
