@@ -12,7 +12,8 @@ Author
 import os
 from time import localtime, strftime
 
-import boto
+# Amazon SDK for EC2
+from boto.ec2.regioninfo import RegionInfo
 
 # Amazon SDK for Elastic Map Reduce
 from boto.emr.connection import EmrConnection
@@ -22,6 +23,7 @@ from boto.emr.step import StreamingStep
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
+
 class Rankmaniac:
     '''Rankmaniac Wrapper
 
@@ -29,6 +31,9 @@ class Rankmaniac:
     It should provide all the functionality required in terms of MapReduce,
     so students don't need to worry about learning the EMR and S3 API.
     '''
+
+    DefaultRegionName = 'us-west-2'
+    DefaultRegionEndpoint = 'elasticmapreduce.us-west-2.amazonaws.com'
 
     def __init__(self, team_id, access_key, secret_key,
                  bucket='cs144caltech'):
@@ -43,15 +48,13 @@ class Rankmaniac:
             secret_key      string      AWS secret key.
         '''
 
-
-        boto.config.set('Boto', 'emr_region_name', 'us-west-2')
-        boto.config.set('Boto', 'emr_region_endpoint',
-                        'elasticmapreduce.us-west-2.amazonaws.com')
+        region = RegionInfo(self, self.DefaultRegionName,
+                            self.DefaultRegionEndpoint)
 
         self.s3_bucket = bucket
 
         self.team_id = team_id
-        self.emr_conn = EmrConnection(access_key, secret_key)
+        self.emr_conn = EmrConnection(access_key, secret_key, region=region)
         self.s3_conn = S3Connection(access_key, secret_key)
         self.job_id = None
 
