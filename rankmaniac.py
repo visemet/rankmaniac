@@ -72,6 +72,7 @@ class Rankmaniac:
         self.job_id = None
 
         self._reset()
+        self._num_instances = 1
 
     def _reset(self):
         """
@@ -301,7 +302,7 @@ class Rankmaniac:
         """
 
         if not self.job_id:
-            raise Exception('No job is running.')
+            raise RankmaniacError('No job is running.')
 
         return self._emr_conn.describe_jobflow(self.job_id)
 
@@ -325,57 +326,59 @@ class Rankmaniac:
 
     def _get_default_outdir(self, name, iter_no=None):
         """
-        TODO: document
+        Returns the default output directory, which is 'iter_no/name/'.
         """
 
         if iter_no is None:
             iter_no = self._iter_no
-        iter_no = str(iter_no)
 
         # Return iter_no/name/ **with** the trailing slash
-        return os.path.join(iter_no, name, '')
+        return '%s/%s/' % (iter_no, name)
 
     def _submit_new_job(self, steps):
         """
-        TODO: document
+        Submits a new job to run on Amazon EMR.
         """
 
-        if self.job_id:
-            raise Exception('There currently already exists a running job.')
+        if self.job_id is not None:
+            raise RankmaniacError('A job is already running.')
 
         job_name = self._make_name()
-        log_uri = self._get_s3_url() + 'job_logs'
+        num_instances = self._num_instances
+        log_uri = self._get_s3_team_uri('job_logs')
         self.job_id = self._emr_conn.run_jobflow(name=job_name,
                                                  steps=steps,
-                                                 num_instances=1,
-                                                 log_uri=log_uri,
-                                                 keep_alive=True)
+                                                 num_instances=num_instances,
+                                                 log_uri=log_uri)
 
-    def _make_name(self):
-
-        return '%s-%s' % (self.team_id,
-                          strftime('%m-%d-%Y %H:%M:%S', localtime()))
-
-
-    def _make_step(self, mapper, reducer, input, output, nm=1, nr=1):
-
-        job_name = self._make_name()
-        team_s3 = self._get_s3_url()
+    def _make_step(self, mapper, reducer, input, output,
+                   num_mappers=1, num_reducers=1):
+        """
+        Returns a new step that runs the specified mapper and reducer,
+        reading from the specified input and writing to the specified
+        output.
+        """
 
         bucket = self._s3_conn.get_bucket(self._s3_bucket)
+
+        # Clear out current bucket/output contents for team
         keys = bucket.list(prefix='%s/%s' % (self.team_id, output))
-        bucket.delete_keys(map(lambda k: k.name, keys))
+        bucket.delete_keys(keys)
 
-        return \
-            StreamingStep(name=job_name,
-                          step_args=
-                              ['-jobconf', 'mapred.map.tasks=%d' % nm,
-                               '-jobconf', 'mapred.reduce.tasks=%d' % nr],
-                          mapper=team_s3 + mapper,
-                          reducer=team_s3 + reducer,
-                          input=team_s3 + input,
-                          output=team_s3 + output)
+        step_name = self._make_name()
+        step_args = ['-jobconf', 'mapred.map.tasks=%d' % (num_mappers),
+                     '-jobconf', 'mapred.reduce.tasks=%d' % (num_reducers)]
 
-    def _get_s3_url(self):
+        return StreamingStep(name=step_name,
+                            step_args=step_args,
+                            mapper=self._get_s3_team_uri(mapper),
+                            reducer=self._get_s3_team_uri(reducer),
+                            input=self._get_s3_team_uri(input),
+                            output=self._get_s3_team_uri(output))
 
-        return 's3n://%s/%s/' % (self._s3_bucket, self.team_id)
+    def _make_name(self):
+        return strftime('%%s %m-%d-%Y %H:%M:%S', localtime()) % (self.team_id)
+
+    def _get_s3_team_uri(self, *args):
+        return 's3n://%s/%s/%s' % (self._s3_bucket, self.team_id,
+                                   '/'.join(args))
