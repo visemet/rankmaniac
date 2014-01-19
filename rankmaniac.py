@@ -247,59 +247,66 @@ class Rankmaniac:
 
         return self._emr_conn.describe_jobflow(self.job_id)
 
-    def upload(self, in_dir='data'):
-        '''Upload local data to S3
+    def upload(self, indir='data'):
+        """
+        Uploads the local data to Amazon S3 under the configured bucket
+        and key prefix (the team identifier). This way the code can be
+        accessed by Amazon EMR to compute pagerank.
 
-        Uploads the files in the specified directory to S3, where it can be
-        used by Elastic MapReduce.
+        Keyword arguments:
+            indir       <str>       the base directory from which to
+                                    upload contents.
 
-        Note: this method only uploads files in the root of in_dir. It does
-              NOT scan through subdirectories.
+        Special notes:
+            This method only uploads **files** in the specified
+            directory. It does not scan through subdirectories.
 
-        Arguments:
-            in_dir          string      optional, defaults to 'data'. Uses
-                                        this directory as the base directory
-                                        from which to upload.
-        '''
+            WARNING! This method removes all previous (or ongoing)
+            submission results, so it is unsafe to call while a job is
+            already running (and possibly started elsewhere).
+        """
 
-        bucket = self._s3_conn.get_bucket(self._s3_bucket)
-        keys = bucket.list(prefix='%s/' % self.team_id)
-        bucket.delete_keys(map(lambda k: k.name, keys))
-
-        to_upload = [
-            (os.path.join(in_dir, file_name),
-             os.path.join(self.team_id, file_name))
-            for file_name in os.listdir(in_dir)
-            if os.path.isfile(os.path.join(in_dir, file_name))]
-
-        for l, r in to_upload:
-            key = Key(bucket)
-            key.key = r
-            key.set_contents_from_filename(l)
-
-    def download(self, out_dir='data'):
-        '''Download S3 data to local directory
-
-        Downloads S3 data to the specified directory.
-
-        Note: this method DOES download the entire directory hierarchy as
-              given by S3. It will create subdirectories as needed.
-
-        Arguments:
-            out_dir         string      optional, defaults to 'data'. Downloads
-                                        files to this directory.
-        '''
+        if self.job_id is not None:
+            raise RankmaniacError('A job is already running.')
 
         bucket = self._s3_conn.get_bucket(self._s3_bucket)
-        keys = bucket.list(prefix='%s/' % self.team_id)
+
+        # Clear out current bucket contents for team
+        keys = bucket.list(prefix='%s/' % (self.team_id))
+        bucket.delete_keys(keys)
+
+        for filename in os.listdir(indir):
+            relpath = os.path.join(indir, filename)
+            if os.path.isfile(relpath):
+                keyname = '%s/%s' % (self.team_id, filename)
+                key = bucket.new_key(keyname)
+                key.set_contents_from_filename(relpath)
+
+    def download(self, outdir='results'):
+        """
+        Downloads the results from Amazon S3 to the local directory.
+
+        Keyword arguments:
+            outdir      <str>       the base directory to which to
+                                    download contents.
+
+        Special notes:
+            This method downloads all keys (files) from the configured
+            bucket for this particular team. It creates subdirectories
+            as needed.
+        """
+
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
+        keys = bucket.list(prefix='%s/' % (self.team_id))
         for key in keys:
-            fp = os.path.join(out_dir, '/'.join(key.name.split('/')[1:]))
-            fp_dir = os.path.dirname(fp)
-            if os.path.exists(fp):
-                os.remove(fp)
-            elif not os.path.exists(fp_dir):
-                os.makedirs(fp_dir)
-            key.get_contents_to_filename(fp)
+            suffix = key.name.split('/')[1:] # removes team identifier
+            filename = os.path.join(outdir, *suffix)
+            dirname = os.path.dirname(filename)
+
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+
+            key.get_contents_to_filename(filename)
 
     def _make_name(self):
 
