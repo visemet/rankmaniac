@@ -23,6 +23,9 @@ from boto.emr.step import StreamingStep
 from boto.s3.connection import S3Connection
 from boto.s3.key import Key
 
+class RankmaniacError(Exception):
+    """General (catch-all) class for exceptions in this module."""
+    pass
 
 class Rankmaniac:
     """
@@ -68,14 +71,21 @@ class Rankmaniac:
         self.s3_conn = S3Connection(access_key, secret_key)
         self.job_id = None
 
-        self._iter_no = 0
-        self._infile = None
-        self._last_outdir = None
+        self._reset()
 
     def __del__(self):
 
         if self.job_id:
             self.terminate_job()
+
+    def _reset(self):
+        """
+        Resets the internal state of the job and submission.
+        """
+
+        self._iter_no = 0
+        self._infile = None
+        self._last_outdir = None
 
     def set_input_file(self, filename):
         """
@@ -199,16 +209,17 @@ class Rankmaniac:
         return i / 2 - 1
 
     def terminate_job(self):
-        '''Terminate a running MapReduce job
-
-        Stops the current running job.
-        '''
+        """
+        Terminates a running map-reduce job.
+        """
 
         if not self.job_id:
-            raise Exception('No job is running.')
+            raise RankmaniacError('No job is running.')
 
         self.emr_conn.terminate_jobflow(self.job_id)
         self.job_id = None
+
+        self._reset()
 
     def get_job(self):
         '''Gets the running job details
