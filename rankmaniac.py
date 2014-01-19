@@ -74,9 +74,34 @@ class Rankmaniac:
         self._reset()
 
     def __del__(self):
+        """
+        (destructor)
+
+        Terminates the job if any, and closes the connections to Amazon
+        S3 and EMR.
+        """
 
         if self.job_id:
             self.terminate_job()
+
+        self._s3_conn.close()
+        self._emr_conn.close()
+
+    def __enter__(self):
+        """
+        Used for `with` syntax. Simply returns this instance since the
+        set-up has all been done in the constructor.
+        """
+
+        return self
+
+    def __exit__(self, type, value, traceback):
+        """
+        Refer to __del__().
+        """
+
+        self.__del__()
+        return False # do not swallow any exceptions
 
     def _reset(self):
         """
