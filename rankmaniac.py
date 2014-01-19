@@ -207,14 +207,25 @@ class Rankmaniac:
 
     def is_done(self):
         """
-        Gets the first part of the output file and checks whether it
-        startswith 'FinalRank'.
+        Returns `True` if the map-reduce job is done, and `False`
+        otherwise.
+
+        Checks whether the jobflow has completed, failed, or been
+        terminated.
+
+        Otherwise, gets the first part of the process-step output file
+        and checks whether its contents begins with the string
+        'FinalRank'.
 
         Special notes:
             WARNING! The usage of this method in your code requires that
             that you used the default output directories in all calls
             to do_iter().
         """
+
+        jobflow = self.describe()
+        if jobflow.state in ('COMPLETED', 'FAILED', 'TERMINATED'):
+            return True
 
         iter_no = self._get_last_process_step_iter_no()
         if iter_no < 0:
