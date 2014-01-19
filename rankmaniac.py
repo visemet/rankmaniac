@@ -73,6 +73,15 @@ class Rankmaniac:
 
         self._reset()
 
+    def _reset(self):
+        """
+        Resets the internal state of the job and submission.
+        """
+
+        self._iter_no = 0
+        self._infile = None
+        self._last_outdir = None
+
     def __del__(self):
         """
         (destructor)
@@ -82,7 +91,7 @@ class Rankmaniac:
         """
 
         if self.job_id:
-            self.terminate_job()
+            self.terminate()
 
         self._s3_conn.close()
         self._emr_conn.close()
@@ -103,19 +112,49 @@ class Rankmaniac:
         self.__del__()
         return False # do not swallow any exceptions
 
-    def _reset(self):
+    def upload(self, indir='data'):
         """
-        Resets the internal state of the job and submission.
+        Uploads the local data to Amazon S3 under the configured bucket
+        and key prefix (the team identifier). This way the code can be
+        accessed by Amazon EMR to compute pagerank.
+
+        Keyword arguments:
+            indir       <str>       the base directory from which to
+                                    upload contents.
+
+        Special notes:
+            This method only uploads **files** in the specified
+            directory. It does not scan through subdirectories.
+
+            WARNING! This method removes all previous (or ongoing)
+            submission results, so it is unsafe to call while a job is
+            already running (and possibly started elsewhere).
         """
 
-        self._iter_no = 0
-        self._infile = None
-        self._last_outdir = None
+        if self.job_id is not None:
+            raise RankmaniacError('A job is already running.')
 
-    def set_input_file(self, filename):
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
+
+        # Clear out current bucket contents for team
+        keys = bucket.list(prefix='%s/' % (self.team_id))
+        bucket.delete_keys(keys)
+
+        for filename in os.listdir(indir):
+            relpath = os.path.join(indir, filename)
+            if os.path.isfile(relpath):
+                keyname = '%s/%s' % (self.team_id, filename)
+                key = bucket.new_key(keyname)
+                key.set_contents_from_filename(relpath)
+
+    def set_infile(self, filename):
         """
-        TODO: document
+        Sets the data file to use for the first iteration of the
+        pagerank step in the map-reduce job.
         """
+
+        if self.job_id is not None:
+            raise RankmaniacError('A job is already running.')
 
         self._infile = filename
 
@@ -126,7 +165,6 @@ class Rankmaniac:
         """
         Adds a pagerank step and a process step to the current job.
         """
-
 
         num_process_mappers = 1
         num_process_reducers = 1
@@ -166,6 +204,110 @@ class Rankmaniac:
         self._last_outdir = process_output
         self._iter_no += 1
 
+    def is_done(self):
+        """
+        Gets the first part of the output file and checks whether it
+        contains FinalRank
+
+        REVIEW: requires that the default output directory is used
+        """
+
+        iter_no = self._get_last_process_step_iter_no()
+        if iter_no < 0:
+            return False
+
+        outdir = self._get_default_outdir('process', iter_no=iter_no)
+        keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
+
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
+        key = Key(bucket=bucket, name=keyname)
+        contents = key.next()
+
+        return contents.startswith('FinalRank')
+
+    def terminate(self):
+        """
+        Terminates a running map-reduce job.
+        """
+
+        if not self.job_id:
+            raise RankmaniacError('No job is running.')
+
+        self._emr_conn.terminate_jobflow(self.job_id)
+        self.job_id = None
+
+        self._reset()
+
+    def download(self, outdir='results'):
+        """
+        Downloads the results from Amazon S3 to the local directory.
+
+        Keyword arguments:
+            outdir      <str>       the base directory to which to
+                                    download contents.
+
+        Special notes:
+            This method downloads all keys (files) from the configured
+            bucket for this particular team. It creates subdirectories
+            as needed.
+        """
+
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
+        keys = bucket.list(prefix='%s/' % (self.team_id))
+        for key in keys:
+            suffix = key.name.split('/')[1:] # removes team identifier
+            filename = os.path.join(outdir, *suffix)
+            dirname = os.path.dirname(filename)
+
+            if not os.path.exists(dirname):
+                os.makedirs(dirname)
+
+            key.get_contents_to_filename(filename)
+
+    def describe(self):
+        '''Gets the running job details
+
+        Returns:
+            JobFlow object with relevant fields:
+                state           string      the state of the job flow, either
+                                            COMPLETED | FAILED | TERMINATED
+                                            RUNNING | SHUTTING_DOWN | STARTING
+                                            WAITING | BOOTSTRAPPING
+                steps           list(Step)  a list of the step details in the
+                                            workflow. A Step has the relevant
+                                            fields:
+                                                status              string
+                                                startdatetime       string
+                                                enddatetime         string
+
+        Note: Amazon has an upper-limit on the frequency with which you can
+              call this function; we have had success with calling it one
+              every 10 seconds.
+        '''
+
+        if not self.job_id:
+            raise Exception('No job is running.')
+
+        return self._emr_conn.describe_jobflow(self.job_id)
+
+    def _get_last_process_step_iter_no(self):
+        """
+        Returns the most recently process-step of the job flow that has
+        been completed.
+        """
+
+        steps = self.describe().steps
+        i = 1
+
+        while i < len(steps):
+            step = steps[i]
+            if step.state != 'COMPLETED':
+                break
+
+            i += 2
+
+        return i / 2 - 1
+
     def _get_default_outdir(self, name, iter_no=None):
         """
         TODO: document
@@ -193,145 +335,6 @@ class Rankmaniac:
                                                  num_instances=1,
                                                  log_uri=log_uri,
                                                  keep_alive=True)
-
-    def is_done(self):
-        """
-        Gets the first part of the output file and checks whether it
-        contains FinalRank
-
-        REVIEW: requires that the default output directory is used
-        """
-
-        iter_no = self._get_last_process_step_iter_no()
-        if iter_no < 0:
-            return False
-
-        outdir = self._get_default_outdir('process', iter_no=iter_no)
-        keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
-
-        bucket = self._s3_conn.get_bucket(self._s3_bucket)
-        key = Key(bucket=bucket, name=keyname)
-        contents = key.next()
-
-        return contents.startswith('FinalRank')
-
-    def _get_last_process_step_iter_no(self):
-        """
-        Returns the most recently process-step of the job flow that has
-        been completed.
-        """
-
-        steps = self.get_job().steps
-        i = 1
-
-        while i < len(steps):
-            step = steps[i]
-            if step.state != 'COMPLETED':
-                break
-
-            i += 2
-
-        return i / 2 - 1
-
-    def terminate_job(self):
-        """
-        Terminates a running map-reduce job.
-        """
-
-        if not self.job_id:
-            raise RankmaniacError('No job is running.')
-
-        self._emr_conn.terminate_jobflow(self.job_id)
-        self.job_id = None
-
-        self._reset()
-
-    def get_job(self):
-        '''Gets the running job details
-
-        Returns:
-            JobFlow object with relevant fields:
-                state           string      the state of the job flow, either
-                                            COMPLETED | FAILED | TERMINATED
-                                            RUNNING | SHUTTING_DOWN | STARTING
-                                            WAITING | BOOTSTRAPPING
-                steps           list(Step)  a list of the step details in the
-                                            workflow. A Step has the relevant
-                                            fields:
-                                                status              string
-                                                startdatetime       string
-                                                enddatetime         string
-
-        Note: Amazon has an upper-limit on the frequency with which you can
-              call this function; we have had success with calling it one
-              every 10 seconds.
-        '''
-
-        if not self.job_id:
-            raise Exception('No job is running.')
-
-        return self._emr_conn.describe_jobflow(self.job_id)
-
-    def upload(self, indir='data'):
-        """
-        Uploads the local data to Amazon S3 under the configured bucket
-        and key prefix (the team identifier). This way the code can be
-        accessed by Amazon EMR to compute pagerank.
-
-        Keyword arguments:
-            indir       <str>       the base directory from which to
-                                    upload contents.
-
-        Special notes:
-            This method only uploads **files** in the specified
-            directory. It does not scan through subdirectories.
-
-            WARNING! This method removes all previous (or ongoing)
-            submission results, so it is unsafe to call while a job is
-            already running (and possibly started elsewhere).
-        """
-
-        if self.job_id is not None:
-            raise RankmaniacError('A job is already running.')
-
-        bucket = self._s3_conn.get_bucket(self._s3_bucket)
-
-        # Clear out current bucket contents for team
-        keys = bucket.list(prefix='%s/' % (self.team_id))
-        bucket.delete_keys(keys)
-
-        for filename in os.listdir(indir):
-            relpath = os.path.join(indir, filename)
-            if os.path.isfile(relpath):
-                keyname = '%s/%s' % (self.team_id, filename)
-                key = bucket.new_key(keyname)
-                key.set_contents_from_filename(relpath)
-
-    def download(self, outdir='results'):
-        """
-        Downloads the results from Amazon S3 to the local directory.
-
-        Keyword arguments:
-            outdir      <str>       the base directory to which to
-                                    download contents.
-
-        Special notes:
-            This method downloads all keys (files) from the configured
-            bucket for this particular team. It creates subdirectories
-            as needed.
-        """
-
-        bucket = self._s3_conn.get_bucket(self._s3_bucket)
-        keys = bucket.list(prefix='%s/' % (self.team_id))
-        for key in keys:
-            suffix = key.name.split('/')[1:] # removes team identifier
-            filename = os.path.join(outdir, *suffix)
-            dirname = os.path.dirname(filename)
-
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
-
-            key.get_contents_to_filename(filename)
 
     def _make_name(self):
 
