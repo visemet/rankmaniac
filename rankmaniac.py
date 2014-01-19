@@ -64,11 +64,11 @@ class Rankmaniac:
         region = RegionInfo(None, self.DefaultRegionName,
                             self.DefaultRegionEndpoint)
 
-        self.s3_bucket = bucket
+        self._s3_bucket = bucket
+        self._s3_conn = S3Connection(access_key, secret_key)
+        self._emr_conn = EmrConnection(access_key, secret_key, region=region)
 
         self.team_id = team_id
-        self.emr_conn = EmrConnection(access_key, secret_key, region=region)
-        self.s3_conn = S3Connection(access_key, secret_key)
         self.job_id = None
 
         self._reset()
@@ -134,7 +134,7 @@ class Rankmaniac:
         if self.job_id is None:
             self._submit_new_job(steps)
         else:
-            self.emr_conn.add_jobflow_steps(self.job_id, steps)
+            self._emr_conn.add_jobflow_steps(self.job_id, steps)
 
         # Store `process_output` directory so it can be used in
         # subsequent iteration
@@ -163,11 +163,11 @@ class Rankmaniac:
 
         job_name = self._make_name()
         log_uri = self._get_s3_url() + 'job_logs'
-        self.job_id = self.emr_conn.run_jobflow(name=job_name,
-                                                steps=steps,
-                                                num_instances=1,
-                                                log_uri=log_uri,
-                                                keep_alive=True)
+        self.job_id = self._emr_conn.run_jobflow(name=job_name,
+                                                 steps=steps,
+                                                 num_instances=1,
+                                                 log_uri=log_uri,
+                                                 keep_alive=True)
 
     def is_done(self):
         """
@@ -184,7 +184,7 @@ class Rankmaniac:
         outdir = self._get_default_outdir('process', iter_no=iter_no)
         keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
 
-        bucket = self.s3_conn.get_bucket(self.s3_bucket)
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
         key = Key(bucket=bucket, name=keyname)
         contents = key.next()
 
@@ -216,7 +216,7 @@ class Rankmaniac:
         if not self.job_id:
             raise RankmaniacError('No job is running.')
 
-        self.emr_conn.terminate_jobflow(self.job_id)
+        self._emr_conn.terminate_jobflow(self.job_id)
         self.job_id = None
 
         self._reset()
@@ -245,7 +245,7 @@ class Rankmaniac:
         if not self.job_id:
             raise Exception('No job is running.')
 
-        return self.emr_conn.describe_jobflow(self.job_id)
+        return self._emr_conn.describe_jobflow(self.job_id)
 
     def upload(self, in_dir='data'):
         '''Upload local data to S3
@@ -262,7 +262,7 @@ class Rankmaniac:
                                         from which to upload.
         '''
 
-        bucket = self.s3_conn.get_bucket(self.s3_bucket)
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
         keys = bucket.list(prefix='%s/' % self.team_id)
         bucket.delete_keys(map(lambda k: k.name, keys))
 
@@ -290,7 +290,7 @@ class Rankmaniac:
                                         files to this directory.
         '''
 
-        bucket = self.s3_conn.get_bucket(self.s3_bucket)
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
         keys = bucket.list(prefix='%s/' % self.team_id)
         for key in keys:
             fp = os.path.join(out_dir, '/'.join(key.name.split('/')[1:]))
@@ -312,7 +312,7 @@ class Rankmaniac:
         job_name = self._make_name()
         team_s3 = self._get_s3_url()
 
-        bucket = self.s3_conn.get_bucket(self.s3_bucket)
+        bucket = self._s3_conn.get_bucket(self._s3_bucket)
         keys = bucket.list(prefix='%s/%s' % (self.team_id, output))
         bucket.delete_keys(map(lambda k: k.name, keys))
 
@@ -328,4 +328,4 @@ class Rankmaniac:
 
     def _get_s3_url(self):
 
-        return 's3n://%s/%s/' % (self.s3_bucket, self.team_id)
+        return 's3n://%s/%s/' % (self._s3_bucket, self.team_id)
