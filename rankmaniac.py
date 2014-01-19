@@ -86,8 +86,8 @@ class Rankmaniac:
         """
         (destructor)
 
-        Terminates the job if any, and closes the connections to Amazon
-        S3 and EMR.
+        Terminates the map-reduce job if any, and closes the connections
+        to Amazon S3 and EMR.
         """
 
         if self.job_id:
@@ -207,9 +207,12 @@ class Rankmaniac:
     def is_done(self):
         """
         Gets the first part of the output file and checks whether it
-        contains FinalRank
+        startswith 'FinalRank'.
 
-        REVIEW: requires that the default output directory is used
+        Special notes:
+            WARNING! The usage of this method in your code requires that
+            that you used the default output directories in all calls
+            to do_iter().
         """
 
         iter_no = self._get_last_process_step_iter_no()
@@ -265,25 +268,37 @@ class Rankmaniac:
             key.get_contents_to_filename(filename)
 
     def describe(self):
-        '''Gets the running job details
+        """
+        Gets the current map-reduce job details.
 
-        Returns:
-            JobFlow object with relevant fields:
-                state           string      the state of the job flow, either
-                                            COMPLETED | FAILED | TERMINATED
-                                            RUNNING | SHUTTING_DOWN | STARTING
-                                            WAITING | BOOTSTRAPPING
-                steps           list(Step)  a list of the step details in the
-                                            workflow. A Step has the relevant
-                                            fields:
-                                                status              string
-                                                startdatetime       string
-                                                enddatetime         string
+        Returns a boto.emr.emrobject.JobFlow object.
 
-        Note: Amazon has an upper-limit on the frequency with which you can
-              call this function; we have had success with calling it one
-              every 10 seconds.
-        '''
+        Special notes:
+            The JobFlow object has the following relevant fields.
+                state       <str>           the state of the job flow,
+                                            either COMPLETED
+                                                 | FAILED
+                                                 | TERMINATED
+                                                 | RUNNING
+                                                 | SHUTTING_DOWN
+                                                 | STARTING
+                                                 | WAITING
+
+                steps       <list(boto.emr.emrobject.Step)>
+                            a list of the step details in the workflow.
+
+            The Step object has the following relevant fields.
+                state               <str>       the state of the step.
+
+                startdatetime       <str>       the start time of the
+                                                job.
+
+                enddatetime         <str>       the end time of the job.
+
+            WARNING! Amazon has an upper-limit on the frequency with
+            which you can call this method; we have had success with
+            calling it at most once every 10 seconds.
+        """
 
         if not self.job_id:
             raise Exception('No job is running.')
