@@ -15,7 +15,10 @@ import os
 import ConfigParser
 from dateutil.parser import parse as dtparse
 
+from boto.exception import EmrResponseError
+
 from config import ACCESS_KEY, SECRET_KEY
+from config import S3_STUDENTS_BUCKET, S3_GRADING_BUCKET
 from rankmaniac import Rankmaniac
 
 class Grader(Rankmaniac):
@@ -26,7 +29,7 @@ class Grader(Rankmaniac):
     to be able to compute the time duration of the map-reduce job.
     """
 
-    def __init__(self, team_id, bucket, max_iter=50, num_instances=10):
+    def __init__(self, team_id, max_iter=50, num_instances=10):
         """
         (constructor)
 
@@ -35,7 +38,7 @@ class Grader(Rankmaniac):
         """
 
         Rankmaniac.__init__(self, team_id, ACCESS_KEY, SECRET_KEY,
-                            bucket=bucket)
+                            bucket=S3_GRADING_BUCKET)
 
         self._max_iter = max_iter
         self._num_instances=num_instances
@@ -55,30 +58,31 @@ class Grader(Rankmaniac):
         process_map = 'process_map.py'
         process_reduce = 'process_reduce.py'
 
-        filename = '%s.cfg' % (self.team_id)
-        if self._download_config(filename):
-            # Read the configuration and override defaults
-            config = ConfigParser.SafeConfigParser()
-            config.read(filename)
+        if self._copy_keys(S3_STUDENTS_BUCKET, S3_GRADING_BUCKET):
+            filename = '%s.cfg' % (self.team_id)
+            if self._download_config(filename):
+                # Read the configuration and override defaults
+                config = ConfigParser.SafeConfigParser()
+                config.read(filename)
 
-            section = 'Rankmaniac'
-            if config.has_section(section):
-                pagerank_map = config.get(section, 'pagerank_map')
-                pagerank_reduce = config.get(section, 'pagerank_reduce')
-                process_map = config.get(section, 'process_map')
-                process_reduce = config.get(section, 'process_reduce')
+                section = 'Rankmaniac'
+                if config.has_section(section):
+                    pagerank_map = config.get(section, 'pagerank_map')
+                    pagerank_reduce = config.get(section, 'pagerank_reduce')
+                    process_map = config.get(section, 'process_map')
+                    process_reduce = config.get(section, 'process_reduce')
 
-            for i in range(max_iter):
-                while True:
-                    try:
-                        self.do_iter(pagerank_map, pagerank_reduce,
-                                     process_map, process_reduce)
-                        break
-                    except EmrResponseError:
-                        sleep(10) # call Amazon APIs infrequently
+                for i in range(max_iter):
+                    while True:
+                        try:
+                            self.do_iter(pagerank_map, pagerank_reduce,
+                                         process_map, process_reduce)
+                            break
+                        except EmrResponseError:
+                            sleep(10) # call Amazon APIs infrequently
 
-            os.remove(filename)
-            return True
+                os.remove(filename)
+                return True
 
         return False # signal set-up has failed
 
@@ -98,6 +102,20 @@ class Grader(Rankmaniac):
 
         # TODO: implement
         return 0
+
+    def _copy_keys(self, source_bucket_name, dest_bucket_name):
+        """
+        Copies the keys of a particular team from the source bucket to
+        the destination bucket.
+        """
+
+        source_bucket = self._s3_conn.get_bucket(source_bucket_name)
+        keys = bucket.list(prefix='%s/' % (self.team_id))
+        for key in keys:
+            source_bucket.copy(dest_bucket_name, key.name)
+
+        # Return whether anything was copied, i.e. previously submitted
+        return len(keys) > 0
 
     def _download_config(self, filename='rankmaniac.cfg'):
         """
