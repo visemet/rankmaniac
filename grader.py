@@ -61,8 +61,17 @@ class Grader(Rankmaniac):
         process_reduce = 'process_reduce.py'
 
         if self._copy_keys(S3_STUDENTS_BUCKET, S3_GRADING_BUCKET):
+            # Download the configuration from the student bucket
             filename = '%s.cfg' % (self.team_id)
             if self._download_config(filename):
+                # Upload the specified dataset to the grading bucket
+                bucket = self._s3_conn.get_bucket(S3_GRADING_BUCKET)
+                relpath = os.path.join('data', self._infile)
+                if os.path.isfile(relpath): # also checks if file exists
+                    keyname = '%s/%s' % (self.team_id, self._infile)
+                    key = bucket.new_key(keyname)
+                    key.set_contents_from_filename(relpath)
+
                 # Read the configuration and override defaults
                 config = ConfigParser.SafeConfigParser()
                 config.read(filename)
@@ -152,6 +161,8 @@ class Grader(Rankmaniac):
         Returns the amount of time, in seconds, each step of the
         map-reduce job took as a list.
         """
+
+        self.is_done()
 
         max_step = 0
         if self._last_process_step_iter_no >= 0:
