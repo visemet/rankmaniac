@@ -105,14 +105,47 @@ class Grader(Rankmaniac):
 
         return sum(self._compute_step_times())
 
-    def compute_penalty(self):
+    def compute_penalty(self, multiplier=30, num_rank=10):
         """
         Returns the amount of time, in seconds, to be added to the
         execution time as penalty for inaccuracy of results.
         """
 
-        # TODO: implement
-        return 0
+        if not self.is_done():
+            return None # not finished yet, so penalty undefined
+
+        # Loads the solutions from the local directory
+        sols = []
+        with open(os.path.join('sols', self._infile), 'r') as f:
+            for line in f:
+                sols.append(int(line.split('\t')[1]))
+
+        # Retrieves the student rankings from Amazon S3
+        i = self._last_process_step_iter_no
+        outdir = self._get_default_outdir('process', iter_no=i)
+        keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
+
+        bucket = self._s3_conn.get_bucket(S3_GRADING_BUCKET)
+        key = Key(bucket=bucket, name=keyname)
+        contents = key.get_contents_as_string()
+
+        # Pad the list with enough values to make sure there are at
+        # least num_rank nodes listed
+        ranks = [-1] * num_rank
+        for index, line in enumerate(contents.splitlines()):
+            ranks.insert(index, int(line.split('\t')[1]))
+
+        sum_sq_diff = 0
+        for (actual, node) in enumerate(ranks[:num_rank]):
+            try:
+                expected = sols.index(node)
+                sum_sq_diff += (actual - expected) ** 2
+            except ValueError:
+                # "Double" penalty here because we do not check
+                # the rankings past num_rank
+                sum_sq_diff += 2 * (actual - num_rank) ** 2
+
+        return multiplier * sum_sq_diff
 
     def _copy_keys(self, source_bucket_name, dest_bucket_name):
         """
