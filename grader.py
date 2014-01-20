@@ -29,7 +29,7 @@ class Grader(Rankmaniac):
     to be able to compute the time duration of the map-reduce job.
     """
 
-    def __init__(self, team_id, max_iter=50, num_instances=10):
+    def __init__(self, team_id, infile, max_iter=50, num_instances=10):
         """
         (constructor)
 
@@ -39,6 +39,8 @@ class Grader(Rankmaniac):
 
         Rankmaniac.__init__(self, team_id, ACCESS_KEY, SECRET_KEY,
                             bucket=S3_GRADING_BUCKET)
+
+        self.set_infile(infile)
 
         self._max_iter = max_iter
         self._num_instances=num_instances
@@ -72,7 +74,7 @@ class Grader(Rankmaniac):
                     process_map = config.get(section, 'process_map')
                     process_reduce = config.get(section, 'process_reduce')
 
-                for i in range(max_iter):
+                for i in range(self._max_iter):
                     while True:
                         try:
                             self.do_iter(pagerank_map, pagerank_reduce,
@@ -109,13 +111,25 @@ class Grader(Rankmaniac):
         the destination bucket.
         """
 
+        num_keys = 0
+
         source_bucket = self._s3_conn.get_bucket(source_bucket_name)
-        keys = bucket.list(prefix='%s/' % (self.team_id))
+        dest_bucket = self._s3_conn.get_bucket(dest_bucket_name)
+
+        # Clear out grading bucket/output contents for team
+        keys = bucket.list(prefix='%s/%s' % (self.team_id, output))
+        dest_bucket.delete_keys(keys)
+
+        keys = source_bucket.list(prefix='%s/' % (self.team_id))
         for key in keys:
-            source_bucket.copy(dest_bucket_name, key.name)
+            keyname = key.name
+            suffix = keyname.split('/', 1)[1] # removes team identifier
+            if '/' not in suffix and '$' not in suffix:
+                key.copy(dest_bucket, keyname)
+                num_keys += 1
 
         # Return whether anything was copied, i.e. previously submitted
-        return len(keys) > 0
+        return num_keys > 0
 
     def _download_config(self, filename='rankmaniac.cfg'):
         """
