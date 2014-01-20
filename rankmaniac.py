@@ -83,6 +83,9 @@ class Rankmaniac:
         self._infile = None
         self._last_outdir = None
 
+        self._last_process_step_iter_no = -1
+        self._is_done = False
+
     def __del__(self):
         """
         (destructor)
@@ -223,22 +226,31 @@ class Rankmaniac:
             to do_iter().
         """
 
-        jobflow = self.describe()
-        if jobflow.state in ('COMPLETED', 'FAILED', 'TERMINATED'):
+        # Cache the result so we can return immediately without hitting
+        # any of the Amazon APIs
+        if self._is_done:
             return True
 
         iter_no = self._get_last_process_step_iter_no()
         if iter_no < 0:
             return False
 
-        outdir = self._get_default_outdir('process', iter_no=iter_no)
-        keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
+        while self._last_process_step_iter_no < iter_no:
+            self._last_process_step_iter_no += 1
+            i = self._last_process_step_iter_no
 
-        bucket = self._s3_conn.get_bucket(self._s3_bucket)
-        key = Key(bucket=bucket, name=keyname)
-        contents = key.next()
+            outdir = self._get_default_outdir('process', iter_no=i)
+            keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
 
-        return contents.startswith('FinalRank')
+            bucket = self._s3_conn.get_bucket(self._s3_bucket)
+            key = Key(bucket=bucket, name=keyname)
+            contents = key.next() # get first chunk of the output file
+
+            if contents.startswith('FinalRank'):
+                self._is_done = True # cache result
+                break
+
+        return self._is_done
 
     def terminate(self):
         """
