@@ -42,7 +42,7 @@ class Rankmaniac:
     DefaultRegionEndpoint = 'elasticmapreduce.us-west-2.amazonaws.com'
 
     def __init__(self, team_id, access_key, secret_key,
-                 bucket='cs144caltech'):
+                 bucket='cs144students'):
         """
         (constructor)
 
