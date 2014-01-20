@@ -8,6 +8,8 @@ at the California Institute of Technology.
 Authored by: Max Hirschhorn (maxh@caltech.edu)
 """
 
+from boto.exception import EmrResponseError
+
 from config import teams, datasets
 
 assert len(datasets) >= 0
