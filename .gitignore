@@ -38,6 +38,7 @@ nosetests.xml
 # Certain directories
 results
 data
+sols
 
 # Certain files
 uploader.py
