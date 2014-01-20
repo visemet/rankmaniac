@@ -8,7 +8,8 @@ at the California Institute of Technology.
 Authored by: Max Hirschhorn (maxh@caltech.edu)
 """
 
-from time import gmtime, strftime
+import sys
+from time import gmtime, strftime, sleep
 
 from boto.exception import EmrResponseError
 
@@ -116,8 +117,9 @@ def handle_kill(args):
     if job is None:
         raise Exception('job already terminated')
 
+    job.terminate() # force terminate to be called
     jobs[job_id] = None
-    del job
+    del job # clean up the rest
 
 def handle_time(args):
     """
@@ -140,6 +142,46 @@ def handle_time(args):
         raise Exception('job already terminated')
 
     print(strftime('%H:%M:%S', gmtime(job.compute_job_time())))
+
+def handle_grade(args):
+    """
+    Handler for the `grade` command.
+    """
+
+    if args.key == 'team':
+        team_id = args.team
+        if team_id not in teams or team_id not in job_ids_by_team_id:
+            raise Exception('invalid team')
+        job_id = job_ids_by_team_id[team_id]
+
+    elif args.key == 'job':
+        job_id = args.job
+        if job_id >= len(jobs):
+            raise Exception('invalid job')
+
+    job = jobs[job_id]
+    if job is None:
+        raise Exception('job already terminated')
+
+    print('Waiting for map-reduce job to finish...')
+    print('  Use Ctrl-C to interrupt')
+    while True:
+        try:
+            sys.stdout.write('.')
+            if job.is_done():
+                # TODO: record execution time and penalty on scoreboard
+                break
+            elif not job.is_alive():
+                # TODO: record failed submission on scoreboard
+                print()
+                print("Failed to output 'FinalRank'!")
+            sleep(20) # call Amazon APIs infrequently
+        except EmrResponseError:
+            sleep(60) # call Amazon APIs infrequently
+        except KeyboardInterrupt:
+            print()
+            break
+    print()
 
 if __name__ == '__main__':
     import argparse
@@ -204,6 +246,19 @@ if __name__ == '__main__':
 
     parser_time_job = subparsers_time.add_parser('job')
     parser_time_job.add_argument('job', metavar='JOB', type=int,
+                                 help='the job identifier')
+
+    # Create the parser for the grade command
+    parser_grade = subparsers.add_parser('grade')
+    parser_grade.set_defaults(func=handle_grade)
+    subparsers_grade = parser_grade.add_subparsers(dest='key')
+
+    parser_grade_team = subparsers_grade.add_parser('team')
+    parser_grade_team.add_argument('team', metavar='TEAM', choices=teams,
+                                  help='the team identifier')
+
+    parser_grade_job = subparsers_grade.add_parser('job')
+    parser_grade_job.add_argument('job', metavar='JOB', type=int,
                                  help='the job identifier')
 
     while True:
