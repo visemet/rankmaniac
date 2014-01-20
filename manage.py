@@ -29,12 +29,12 @@ def handle_list(args):
     """
 
     # display the name of each team
-    if args.kind == 'teams':
+    if args.key == 'teams':
         for team in teams:
             print(team)
 
     # display the state of each job
-    elif args.kind == 'jobs':
+    elif args.key == 'jobs':
         for i, r in enumerate(jobs):
             if r is not None:
                 while True:
@@ -46,7 +46,7 @@ def handle_list(args):
                         sleep(10) # call Amazon APIs infrequently
 
     # display the filename of all available datasets
-    elif args.kind == 'datasets':
+    elif args.key == 'datasets':
         for dataset in datasets:
             print(dataset)
 
@@ -55,10 +55,10 @@ def handle_get(args):
     Handler for the `get` command.
     """
 
-    if args.name == 'bucket':
+    if args.key == 'bucket':
         print(bucket)
 
-    elif args.name == 'infile':
+    elif args.key == 'infile':
         if infile is not None:
             print(infile)
 
@@ -67,10 +67,10 @@ def handle_set(args):
     Handler for the `set` command.
     """
 
-    if args.name == 'bucket':
+    if args.key == 'bucket':
         bucket = args.value
 
-    elif args.name == 'infile':
+    elif args.key == 'infile':
         if args.value not in datasets:
             raise Exception('invalid dataset')
         infile = args.value
@@ -99,13 +99,13 @@ def handle_kill(args):
     Handler for the `kill` command.
     """
 
-    if args.kind == 'team':
+    if args.key == 'team':
         team_id = args.team
         if team_id not in teams or team_id not in job_ids_by_team_id:
             raise Exception('invalid team')
         job_id = job_ids_by_team_id[team_id]
 
-    elif args.kind == 'job':
+    elif args.key == 'job':
         job_id = args.job
         if job_id >= len(jobs):
             raise Exception('invalid job')
@@ -120,26 +120,36 @@ def handle_kill(args):
 if __name__ == '__main__':
     import argparse
 
-    description = 'Manage and execute map-reduce jobs on Amazon EMR.'
-    parser = argparse.ArgumentParser(description=description)
+    desc = 'Manage and execute map-reduce jobs on Amazon EMR.'
+    parser = argparse.ArgumentParser(description=desc)
 
     subparsers = parser.add_subparsers()
 
     # Create the parser for the list command
     parser_list = subparsers.add_parser('list')
-    parser_list.add_argument('kind', choices=['teams', 'jobs', 'datasets'])
+    parser_list.add_argument('key', choices=['teams', 'jobs', 'datasets'],
+                             help='the list to read')
     parser_list.set_defaults(func=handle_list)
 
     # Create the parser for the get command
     parser_get = subparsers.add_parser('get')
-    parser_get.add_argument('name', choices=['bucket', 'infile'])
+    parser_get.add_argument('key', choices=['bucket', 'infile'],
+                            help='the field to get')
     parser_get.set_defaults(func=handle_get)
 
     # Create the parser for the set command
     parser_set = subparsers.add_parser('set')
-    parser_set.add_argument('name', choices=['bucket', 'infile'])
-    parser_set.add_argument('value')
     parser_set.set_defaults(func=handle_set)
+    subparsers_set = parser_set.add_subparsers(dest='key',
+                                               help='the field to set')
+
+    parser_set_bucket = subparsers_set.add_parser('bucket')
+    parser_set_bucket.add_argument('value', metavar='BUCKET',
+                                   help='the bucket name')
+
+    parser_set_infile = subparsers_set.add_parser('infile')
+    parser_set_infile.add_argument('value', metavar='DATASET',
+                                   help='the dataset to use')
 
     # Create the parser for the run command
     parser_run = subparsers.add_parser('run')
@@ -149,7 +159,7 @@ if __name__ == '__main__':
     # Create the parser for the kill command
     parser_kill = subparsers.add_parser('kill')
     parser_kill.set_defaults(func=handle_kill)
-    subparsers_kill = parser_kill.add_subparsers(dest='kind')
+    subparsers_kill = parser_kill.add_subparsers(dest='key')
 
     parser_kill_team = subparsers_kill.add_parser('team')
     parser_kill_team.add_argument('team', metavar='TEAM', choices=teams,
