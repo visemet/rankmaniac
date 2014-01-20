@@ -16,6 +16,7 @@ from __future__ import with_statement # for Python 2.5
 import ConfigParser
 from time import sleep
 
+from boto.exception import EmrResponseError
 from rankmaniac import Rankmaniac
 
 def do_main(team_id, access_key, secret_key,
@@ -52,13 +53,22 @@ def do_main(team_id, access_key, secret_key,
 
         print('Adding %d iterations...' % (max_iter))
         for i in range(max_iter):
-            r.do_iter(pagerank_map, pagerank_reduce,
-                      process_map, process_reduce)
+            while True:
+                try:
+                    r.do_iter(pagerank_map, pagerank_reduce,
+                              process_map, process_reduce)
+                    break
+                except EmrResponseError:
+                    sleep(10) # call Amazon APIs infrequently
 
-        print("Waiting for map-reduce job to finish...")
+        print('Waiting for map-reduce job to finish...')
         print('  Use Ctrl-C to interrupt')
-        while not r.is_done():
+        while True:
             try:
+                if r.is_done():
+                    break
+                sleep(20) # call Amazon APIs infrequently
+            except EmrResponseError:
                 sleep(60) # call Amazon APIs infrequently
             except KeyboardInterrupt:
                 print()
