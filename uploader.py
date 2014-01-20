@@ -13,6 +13,7 @@ Authored by: Max Hirschhorn (maxh@caltech.edu)
 
 from __future__ import with_statement # for Python 2.5
 
+import sys
 import ConfigParser
 from time import sleep
 
@@ -55,17 +56,24 @@ def do_main(team_id, access_key, secret_key,
         for i in range(max_iter):
             while True:
                 try:
+                    sys.stdout.write('.')
                     r.do_iter(pagerank_map, pagerank_reduce,
                               process_map, process_reduce)
                     break
                 except EmrResponseError:
                     sleep(10) # call Amazon APIs infrequently
+        print()
 
         print('Waiting for map-reduce job to finish...')
         print('  Use Ctrl-C to interrupt')
         while True:
             try:
+                sys.stdout.write('.')
                 if r.is_done():
+                    break
+                elif not r.is_alive():
+                    print()
+                    print("Failed to output 'FinalRank'!")
                     break
                 sleep(20) # call Amazon APIs infrequently
             except EmrResponseError:
@@ -73,6 +81,7 @@ def do_main(team_id, access_key, secret_key,
             except KeyboardInterrupt:
                 print()
                 break
+        print()
 
         print('Terminating...')
         print('  Downloading...')

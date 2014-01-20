@@ -213,12 +213,9 @@ class Rankmaniac:
         Returns `True` if the map-reduce job is done, and `False`
         otherwise.
 
-        Checks whether the jobflow has completed, failed, or been
-        terminated.
-
-        Otherwise, gets the first part of the process-step output file
-        and checks whether its contents begins with the string
-        'FinalRank'.
+        For all process-step output files that have not been fetched,
+        gets the first part of the output file, and checks whether its
+        contents begins with the string 'FinalRank'.
 
         Special notes:
             WARNING! The usage of this method in your code requires that
@@ -251,6 +248,24 @@ class Rankmaniac:
                 break
 
         return self._is_done
+
+    def is_alive(self):
+        """
+        Checks whether the jobflow has completed, failed, or been
+        terminated.
+
+        Special notes:
+            WARNING! This method should only be called **after**
+            is_done() in order to be able to distinguish between the
+            cases where the map-reduce job has outputted 'FinalRank'
+            on its final iteration and has a 'COMPLETED' state.
+        """
+
+        jobflow = self.describe()
+        if jobflow.state in ('COMPLETED', 'FAILED', 'TERMINATED'):
+            return False
+
+        return True
 
     def terminate(self):
         """
