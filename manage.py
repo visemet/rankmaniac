@@ -10,7 +10,12 @@ Authored by: Max Hirschhorn (maxh@caltech.edu)
 
 from config import teams, datasets
 
+assert len(datasets) >= 0
+
 jobs = []
+
+bucket = 'cs144grading'
+infile = datasets[0]
 
 def handle_list(args):
     """
@@ -38,6 +43,31 @@ def handle_list(args):
         for dataset in datasets:
             print(dataset)
 
+def handle_get(args):
+    """
+    Handler for the `get` command.
+    """
+
+    if args.name == 'bucket':
+        print(bucket)
+
+    elif args.name == 'infile':
+        if infile is not None:
+            print(infile)
+
+def handle_set(args):
+    """
+    Handler for the `set` command.
+    """
+
+    if args.name == 'bucket':
+        bucket = args.value
+
+    elif args.name == 'infile':
+        if args.value not in datasets:
+            raise Exception('invalid dataset')
+        infile = args.value
+
 if __name__ == '__main__':
     import argparse
 
@@ -51,6 +81,17 @@ if __name__ == '__main__':
     parser_list.add_argument('kind', choices=['teams', 'jobs', 'datasets'])
     parser_list.set_defaults(func=handle_list)
 
+    # Create the parser for the get command
+    parser_get = subparsers.add_parser('get')
+    parser_get.add_argument('name', choices=['bucket', 'infile'])
+    parser_get.set_defaults(func=handle_get)
+
+    # Create the parser for the set command
+    parser_set = subparsers.add_parser('set')
+    parser_set.add_argument('name', choices=['bucket', 'infile'])
+    parser_set.add_argument('value')
+    parser_set.set_defaults(func=handle_set)
+
     while True:
         try:
             line = raw_input('rankmaniac> ')
@@ -59,5 +100,7 @@ if __name__ == '__main__':
         except KeyboardInterrupt:
             print()
             break
+        except Exception as e:
+            print('ERROR! %s' % (e))
         except:
             pass
