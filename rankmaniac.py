@@ -94,7 +94,7 @@ class Rankmaniac:
         to Amazon S3 and EMR.
         """
 
-        if self.job_id:
+        if self.job_id is not None:
             self.terminate()
 
         self._s3_conn.close()
