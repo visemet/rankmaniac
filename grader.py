@@ -154,12 +154,11 @@ class Grader(Rankmaniac):
         """
 
         max_step = 0
-
         if self._last_process_step_iter_no >= 0:
-            max_step = 2 * self._r._last_process_step_iter_no + 1
+            max_step = 2 * self._last_process_step_iter_no + 1
 
         times = []
-        steps = self._r.describe().steps
+        steps = self.describe().steps
 
         i = 0
         while i <= max_step:
