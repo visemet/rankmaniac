@@ -8,6 +8,8 @@ at the California Institute of Technology.
 Authored by: Max Hirschhorn (maxh@caltech.edu)
 """
 
+from time import gmtime, strftime
+
 from boto.exception import EmrResponseError
 
 from config import S3_GRADING_BUCKET
@@ -117,6 +119,28 @@ def handle_kill(args):
     jobs[job_id] = None
     del job
 
+def handle_time(args):
+    """
+    Handler for the `time` command.
+    """
+
+    if args.key == 'team':
+        team_id = args.team
+        if team_id not in teams or team_id not in job_ids_by_team_id:
+            raise Exception('invalid team')
+        job_id = job_ids_by_team_id[team_id]
+
+    elif args.key == 'job':
+        job_id = args.job
+        if job_id >= len(jobs):
+            raise Exception('invalid job')
+
+    job = jobs[job_id]
+    if job is None:
+        raise Exception('job already terminated')
+
+    print(strftime('%H:%M:%S', gmtime(job.compute_job_time())))
+
 if __name__ == '__main__':
     import argparse
 
@@ -167,6 +191,19 @@ if __name__ == '__main__':
 
     parser_kill_job = subparsers_kill.add_parser('job')
     parser_kill_job.add_argument('job', metavar='JOB', type=int,
+                                 help='the job identifier')
+
+    # Create the parser for the time command
+    parser_time = subparsers.add_parser('time')
+    parser_time.set_defaults(func=handle_time)
+    subparsers_time = parser_time.add_subparsers(dest='key')
+
+    parser_time_team = subparsers_time.add_parser('team')
+    parser_time_team.add_argument('team', metavar='TEAM', choices=teams,
+                                  help='the team identifier')
+
+    parser_time_job = subparsers_time.add_parser('job')
+    parser_time_job.add_argument('job', metavar='JOB', type=int,
                                  help='the job identifier')
 
     while True:
