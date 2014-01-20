@@ -117,7 +117,7 @@ class Grader(Rankmaniac):
         dest_bucket = self._s3_conn.get_bucket(dest_bucket_name)
 
         # Clear out grading bucket/output contents for team
-        keys = bucket.list(prefix='%s/%s' % (self.team_id, output))
+        keys = dest_bucket.list(prefix='%s/' % (self.team_id))
         dest_bucket.delete_keys(keys)
 
         keys = source_bucket.list(prefix='%s/' % (self.team_id))
