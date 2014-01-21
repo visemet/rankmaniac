@@ -14,6 +14,7 @@ Authored by: Max Hirschhorn (maxh@caltech.edu)
 import os
 import ConfigParser
 from dateutil.parser import parse as dtparse
+from time import sleep
 
 from boto.exception import EmrResponseError
 
