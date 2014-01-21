@@ -8,7 +8,7 @@ at the California Institute of Technology.
 Authored by: Max Hirschhorn (maxh@caltech.edu)
 """
 
-import sys
+import sys, os
 from time import gmtime, strftime, sleep
 
 from boto.exception import EmrResponseError
@@ -20,6 +20,8 @@ from config import teams, datasets
 from grader import Grader
 
 assert len(datasets) >= 0
+
+unbuff_stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # unbuffered
 
 jobs = []
 job_ids_by_team_id = {}
@@ -90,15 +92,20 @@ def handle_run(args):
         team_ids = TEAMS
 
     # Check for any invalid teams or those with jobs already running
+    unbuff_stdout.write('Validating')
     for team_id in team_ids:
+        unbuff_stdout.write('.')
         if team_id not in TEAMS:
             raise Exception('invalid team %s' % (team_id))
 
         if team_id in job_ids_by_team_id:
             raise Exception('team %s already running' % (team_id))
+    print('')
 
     # Do a second pass to spawn map-reduce jobs
+    unbuff_stdout.write('Spawning')
     for team_id in team_ids:
+        unbuff_stdout.write('.')
         g = Grader(team_id, infile)
         if g.do_setup():
             jobs.append(g)
@@ -107,7 +114,9 @@ def handle_run(args):
             job_ids_by_team_id[team_id] = job_id
         else:
             # TODO: record lack of submission on scoreboard
+            print('')
             print('Team %s had no submission to run.' % (team_id))
+    print('')
 
 def handle_kill(args):
     """
@@ -179,7 +188,7 @@ def handle_grade(args):
     print('  Use Ctrl-C to interrupt')
     while True:
         try:
-            sys.stdout.write('.')
+            unbuff_stdout.write('.')
             if job.is_done():
                 # TODO: record execution time and penalty on scoreboard
                 break
@@ -279,7 +288,7 @@ if __name__ == '__main__':
             args = parser.parse_args(line.split())
             args.func(args)
         except KeyboardInterrupt:
-            print()
+            print('')
             break
         except Exception as e:
             print('ERROR! %s' % (e))
