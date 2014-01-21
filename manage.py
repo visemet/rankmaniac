@@ -14,6 +14,7 @@ from time import gmtime, strftime, sleep
 from boto.exception import EmrResponseError
 
 from config import S3_GRADING_BUCKET
+from config import TEAMS, DATASETS
 from config import teams, datasets
 
 from grader import Grader
@@ -83,11 +84,21 @@ def handle_run(args):
     Handler for the `run` command.
     """
 
-    team_id = args.team
-    if team_id not in teams:
-        raise Exception('invalid team')
+    team_ids = args.teams
 
-    if team_id not in job_ids_by_team_id:
+    if len(team_ids) == 1 and team_ids[0] == '*':
+        team_ids = TEAMS
+
+    # Check for any invalid teams or those with jobs already running
+    for team_id in team_ids:
+        if team_id not in TEAMS:
+            raise Exception('invalid team %s' % (team_id))
+
+        if team_id in job_ids_by_team_id:
+            raise Exception('team %s already running' % (team_id))
+
+    # Do a second pass to spawn map-reduce jobs
+    for team_id in team_ids:
         g = Grader(team_id, infile)
         if g.do_setup():
             jobs.append(g)
@@ -95,7 +106,8 @@ def handle_run(args):
             job_id = len(jobs) - 1
             job_ids_by_team_id[team_id] = job_id
         else:
-            print('No submission to run.')
+            # TODO: record lack of submission on scoreboard
+            print('Team %s had no submission to run.' % (team_id))
 
 def handle_kill(args):
     """
@@ -219,7 +231,7 @@ if __name__ == '__main__':
 
     # Create the parser for the run command
     parser_run = subparsers.add_parser('run')
-    parser_run.add_argument('team', choices=teams)
+    parser_run.add_argument('teams', metavar='TEAM', nargs='+')
     parser_run.set_defaults(func=handle_run)
 
     # Create the parser for the kill command
