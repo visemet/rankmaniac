@@ -62,7 +62,7 @@ def do_main(team_id, access_key, secret_key,
                     break
                 except EmrResponseError:
                     sleep(10) # call Amazon APIs infrequently
-        print()
+        print('')
 
         print('Waiting for map-reduce job to finish...')
         print('  Use Ctrl-C to interrupt')
@@ -72,16 +72,16 @@ def do_main(team_id, access_key, secret_key,
                 if r.is_done():
                     break
                 elif not r.is_alive():
-                    print()
+                    print('')
                     print("Failed to output 'FinalRank'!")
                     break
                 sleep(20) # call Amazon APIs infrequently
             except EmrResponseError:
                 sleep(60) # call Amazon APIs infrequently
             except KeyboardInterrupt:
-                print()
+                print('')
                 break
-        print()
+        print('')
 
         print('Terminating...')
         print('  Downloading...')
