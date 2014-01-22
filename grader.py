@@ -18,7 +18,7 @@ from time import sleep
 
 from boto.exception import EmrResponseError
 
-from config import ACCESS_KEY, SECRET_KEY
+from config import AWS_ACCESS_KEY, AWS_SECRET_KEY
 from config import S3_STUDENTS_BUCKET, S3_GRADING_BUCKET
 from rankmaniac import Rankmaniac
 
@@ -38,7 +38,7 @@ class Grader(Rankmaniac):
         using the credentials from the project configuration.
         """
 
-        Rankmaniac.__init__(self, team_id, ACCESS_KEY, SECRET_KEY,
+        Rankmaniac.__init__(self, team_id, AWS_ACCESS_KEY, AWS_SECRET_KEY,
                             bucket=S3_GRADING_BUCKET)
 
         self.set_infile(infile)
