@@ -168,41 +168,68 @@ def handle_grade(args):
     """
     Handler for the `grade` command.
     """
+    team_ids = args.teams
 
-    if args.key == 'team':
-        team_id = args.team
-        if team_id not in teams or team_id not in job_ids_by_team_id:
-            raise Exception('invalid team')
-        job_id = job_ids_by_team_id[team_id]
+    if len(team_ids) == 1 and team_ids[0] == '*':
+        team_ids = TEAMS
 
-    elif args.key == 'job':
-        job_id = args.job
-        if job_id >= len(jobs):
-            raise Exception('invalid job')
+    # Check for any invalid teams or those with jobs already running
+    unbuff_stdout.write('Validating')
+    for team_id in team_ids:
+        unbuff_stdout.write('.')
+        if team_id not in TEAMS:
+            raise Exception('invalid team %s' % (team_id))
 
-    job = jobs[job_id]
-    if job is None:
-        raise Exception('job already terminated')
+        if team_id not in job_ids_by_team_id:
+            raise Exception('team %s has no job running' % (team_id))
+    print('')
+
+    team_ids = list(team_ids) # make list so can be modified in loop
 
     print('Waiting for map-reduce job to finish...')
     print('  Use Ctrl-C to interrupt')
-    while True:
-        try:
-            unbuff_stdout.write('.')
-            if job.is_done():
-                # TODO: record execution time and penalty on scoreboard
-                break
-            elif not job.is_alive():
-                # TODO: record failed submission on scoreboard
-                print()
-                print("Failed to output 'FinalRank'!")
-            sleep(20) # call Amazon APIs infrequently
-        except EmrResponseError:
-            sleep(60) # call Amazon APIs infrequently
-        except KeyboardInterrupt:
-            print()
-            break
-    print()
+    # Do a second pass to wait on all map-reduce jobs
+    num_finished = 0
+    num_team_ids = len(team_ids)
+    try:
+        while num_finished < num_team_ids:
+            i = 0
+            while i < len(team_ids): # length is NOT constant
+                team_id = team_ids[i]
+                while True:
+                    try:
+                        unbuff_stdout.write('.')
+                        job_id = job_ids_by_team_id[team_id]
+                        job = jobs[job_id]
+
+                        # Check if job is done
+                        if job.is_done():
+                            team_ids.pop(i) # remove, since graded
+                            num_finished += 1
+                            # TODO: record execution time and penalty on
+                            #       scoreboard
+                            print('')
+                            print('Team %s successfully wrote '
+                                  "'FinalRank'" % (team_id))
+                            break
+
+                        # Otherwise, check if job has finished
+                        elif not job.is_alive():
+                            team_ids.pop(i) # remove, since graded
+                            num_finished += 1
+                            # TODO: record failed submission on
+                            #       scoreboard
+                            print('')
+                            print('Team %s failed to write '
+                                  "'FinalRank'" % (team_id))
+                            break
+
+                        sleep(20) # call Amazon APIs infrequently
+                    except EmrResponseError:
+                        sleep(60) # call Amazon APIs infrequently
+                i += 1
+    except KeyboardInterrupt:
+        print('')
 
 if __name__ == '__main__':
     import argparse
@@ -240,7 +267,8 @@ if __name__ == '__main__':
 
     # Create the parser for the run command
     parser_run = subparsers.add_parser('run')
-    parser_run.add_argument('teams', metavar='TEAM', nargs='+')
+    parser_run.add_argument('teams', metavar='TEAM', nargs='+',
+                            help='the team identifier')
     parser_run.set_defaults(func=handle_run)
 
     # Create the parser for the kill command
@@ -271,16 +299,9 @@ if __name__ == '__main__':
 
     # Create the parser for the grade command
     parser_grade = subparsers.add_parser('grade')
+    parser_grade.add_argument('teams', metavar='TEAM', nargs='+',
+                              help='the team identifier')
     parser_grade.set_defaults(func=handle_grade)
-    subparsers_grade = parser_grade.add_subparsers(dest='key')
-
-    parser_grade_team = subparsers_grade.add_parser('team')
-    parser_grade_team.add_argument('team', metavar='TEAM', choices=teams,
-                                  help='the team identifier')
-
-    parser_grade_job = subparsers_grade.add_parser('job')
-    parser_grade_job.add_argument('job', metavar='JOB', type=int,
-                                 help='the job identifier')
 
     while True:
         try:
