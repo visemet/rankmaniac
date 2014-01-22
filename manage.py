@@ -13,21 +13,18 @@ from time import gmtime, strftime, sleep
 
 from boto.exception import EmrResponseError
 
-from config import S3_GRADING_BUCKET
 from config import TEAMS, DATASETS
-from config import teams, datasets
 
 from grader import Grader
 
-assert len(datasets) >= 0
+assert len(DATASETS) >= 0
 
 unbuff_stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # unbuffered
 
 jobs = []
 job_ids_by_team_id = {}
 
-bucket = S3_GRADING_BUCKET
-infile = datasets[0]
+infile = DATASETS[0]
 
 def handle_list(args):
     """
@@ -36,7 +33,7 @@ def handle_list(args):
 
     # display the name of each team
     if args.key == 'teams':
-        for team in teams:
+        for team in TEAMS:
             print(team)
 
     # display the state of each job
@@ -53,7 +50,7 @@ def handle_list(args):
 
     # display the filename of all available datasets
     elif args.key == 'datasets':
-        for dataset in datasets:
+        for dataset in DATASETS:
             print(dataset)
 
 def handle_get(args):
@@ -61,10 +58,7 @@ def handle_get(args):
     Handler for the `get` command.
     """
 
-    if args.key == 'bucket':
-        print(bucket)
-
-    elif args.key == 'infile':
+    if args.key == 'infile':
         if infile is not None:
             print(infile)
 
@@ -73,11 +67,8 @@ def handle_set(args):
     Handler for the `set` command.
     """
 
-    if args.key == 'bucket':
-        bucket = args.value
-
-    elif args.key == 'infile':
-        if args.value not in datasets:
+    if args.key == 'infile':
+        if args.value not in DATASETS:
             raise Exception('invalid dataset')
         infile = args.value
 
@@ -125,7 +116,7 @@ def handle_kill(args):
 
     if args.key == 'team':
         team_id = args.team
-        if team_id not in teams or team_id not in job_ids_by_team_id:
+        if team_id not in TEAMS or team_id not in job_ids_by_team_id:
             raise Exception('invalid team')
         job_id = job_ids_by_team_id[team_id]
 
@@ -149,7 +140,7 @@ def handle_time(args):
 
     if args.key == 'team':
         team_id = args.team
-        if team_id not in teams or team_id not in job_ids_by_team_id:
+        if team_id not in TEAMS or team_id not in job_ids_by_team_id:
             raise Exception('invalid team')
         job_id = job_ids_by_team_id[team_id]
 
@@ -247,7 +238,7 @@ if __name__ == '__main__':
 
     # Create the parser for the get command
     parser_get = subparsers.add_parser('get')
-    parser_get.add_argument('key', choices=['bucket', 'infile'],
+    parser_get.add_argument('key', choices=['infile'],
                             help='the field to get')
     parser_get.set_defaults(func=handle_get)
 
@@ -256,10 +247,6 @@ if __name__ == '__main__':
     parser_set.set_defaults(func=handle_set)
     subparsers_set = parser_set.add_subparsers(dest='key',
                                                help='the field to set')
-
-    parser_set_bucket = subparsers_set.add_parser('bucket')
-    parser_set_bucket.add_argument('value', metavar='BUCKET',
-                                   help='the bucket name')
 
     parser_set_infile = subparsers_set.add_parser('infile')
     parser_set_infile.add_argument('value', metavar='DATASET',
@@ -277,7 +264,7 @@ if __name__ == '__main__':
     subparsers_kill = parser_kill.add_subparsers(dest='key')
 
     parser_kill_team = subparsers_kill.add_parser('team')
-    parser_kill_team.add_argument('team', metavar='TEAM', choices=teams,
+    parser_kill_team.add_argument('team', metavar='TEAM', choices=TEAMS,
                                   help='the team identifier')
 
     parser_kill_job = subparsers_kill.add_parser('job')
@@ -290,7 +277,7 @@ if __name__ == '__main__':
     subparsers_time = parser_time.add_subparsers(dest='key')
 
     parser_time_team = subparsers_time.add_parser('team')
-    parser_time_team.add_argument('team', metavar='TEAM', choices=teams,
+    parser_time_team.add_argument('team', metavar='TEAM', choices=TEAMS,
                                   help='the team identifier')
 
     parser_time_job = subparsers_time.add_parser('job')
