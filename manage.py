@@ -187,6 +187,7 @@ def handle_grade(args):
             i = 0
             while i < len(team_ids): # length is NOT constant
                 team_id = team_ids[i]
+                did_pop = False
                 while True:
                     try:
                         unbuff_stdout.write('.')
@@ -196,6 +197,7 @@ def handle_grade(args):
                         # Check if job is done
                         if job.is_done():
                             team_ids.pop(i) # remove, since graded
+                            did_pop = True
                             num_finished += 1
                             # TODO: record execution time and penalty on
                             #       scoreboard
@@ -207,6 +209,7 @@ def handle_grade(args):
                         # Otherwise, check if job has finished
                         elif not job.is_alive():
                             team_ids.pop(i) # remove, since graded
+                            did_pop = True
                             num_finished += 1
                             # TODO: record failed submission on
                             #       scoreboard
@@ -218,7 +221,10 @@ def handle_grade(args):
                         sleep(20) # call Amazon APIs infrequently
                     except EmrResponseError:
                         sleep(60) # call Amazon APIs infrequently
-                i += 1
+
+                # Only increment if did not pop() from the list
+                if not did_pop:
+                    i += 1
     except KeyboardInterrupt:
         print('')
 
