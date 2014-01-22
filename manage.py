@@ -82,15 +82,33 @@ def handle_run(args):
     if len(team_ids) == 1 and team_ids[0] == '*':
         team_ids = TEAMS
 
+    team_ids = list(team_ids) # make list so can be modified in loop
+
     # Check for any invalid teams or those with jobs already running
     unbuff_stdout.write('Validating')
-    for team_id in team_ids:
+    i = 0
+    while i < len(team_ids): # length is NOT constant
+        team_id = team_ids[i]
         unbuff_stdout.write('.')
-        if team_id not in TEAMS:
-            raise Exception('invalid team %s' % (team_id))
 
-        if team_id in job_ids_by_team_id:
-            raise Exception('team %s already running' % (team_id))
+        # Check that team name is valid
+        if team_id not in TEAMS:
+            if not args.suppress:
+                raise Exception('invalid team %s' % (team_id))
+            team_ids.pop(i)
+            print('')
+            print('SKIPPING! Invalid team %s.' % (team_id))
+
+        # Check that team does not already have job running
+        elif team_id in job_ids_by_team_id:
+            if not args.suppress:
+                raise Exception('team %s already running' % (team_id))
+            team_ids.pop(i)
+            print('')
+            print('SKIPPING! Team %s already has a job running.' % (team_id))
+
+        else:
+            i += 1
     print('')
 
     # Do a second pass to spawn map-reduce jobs
@@ -164,18 +182,34 @@ def handle_grade(args):
     if len(team_ids) == 1 and team_ids[0] == '*':
         team_ids = TEAMS
 
+    team_ids = list(team_ids) # make list so can be modified in loop
+
     # Check for any invalid teams or those with jobs already running
     unbuff_stdout.write('Validating')
-    for team_id in team_ids:
+    i = 0
+    while i < len(team_ids): # length is NOT constant
+        team_id = team_ids[i]
         unbuff_stdout.write('.')
+
+        # Check that team name is valid
         if team_id not in TEAMS:
-            raise Exception('invalid team %s' % (team_id))
+            if not args.suppress:
+                raise Exception('invalid team %s' % (team_id))
+            team_ids.pop(i)
+            print('')
+            print('SKIPPING! Invalid team %s.' % (team_id))
 
-        if team_id not in job_ids_by_team_id:
-            raise Exception('team %s has no job running' % (team_id))
+        # Check that team does not already have job running
+        elif team_id not in job_ids_by_team_id:
+            if not args.suppress:
+                raise Exception('team %s has no job running' % (team_id))
+            team_ids.pop(i)
+            print('')
+            print('SKIPPING! Team %s has no job running.' % (team_id))
+
+        else:
+            i += 1
     print('')
-
-    team_ids = list(team_ids) # make list so can be modified in loop
 
     print('Waiting for map-reduce job to finish...')
     print('  Use Ctrl-C to interrupt')
@@ -203,7 +237,7 @@ def handle_grade(args):
                             #       scoreboard
                             print('')
                             print('Team %s successfully wrote '
-                                  "'FinalRank'" % (team_id))
+                                  "'FinalRank'." % (team_id))
                             break
 
                         # Otherwise, check if job has finished
@@ -215,7 +249,7 @@ def handle_grade(args):
                             #       scoreboard
                             print('')
                             print('Team %s failed to write '
-                                  "'FinalRank'" % (team_id))
+                                  "'FinalRank'." % (team_id))
                             break
 
                         sleep(20) # call Amazon APIs infrequently
@@ -262,6 +296,9 @@ if __name__ == '__main__':
     parser_run = subparsers.add_parser('run')
     parser_run.add_argument('teams', metavar='TEAM', nargs='+',
                             help='the team identifier')
+    parser_run.add_argument('-q', '--suppress', dest='suppress',
+                            action='store_true', default=False,
+                            help='swallow exceptions')
     parser_run.set_defaults(func=handle_run)
 
     # Create the parser for the kill command
@@ -294,6 +331,9 @@ if __name__ == '__main__':
     parser_grade = subparsers.add_parser('grade')
     parser_grade.add_argument('teams', metavar='TEAM', nargs='+',
                               help='the team identifier')
+    parser_grade.add_argument('-q', '--suppress', dest='suppress',
+                              action='store_true', default=False,
+                              help='swallow exceptions')
     parser_grade.set_defaults(func=handle_grade)
 
     while True:
