@@ -17,6 +17,7 @@ from dateutil.parser import parse as dtparse
 from time import sleep
 
 from boto.exception import EmrResponseError
+from boto.s3.key import Key
 
 from config import AWS_ACCESS_KEY, AWS_SECRET_KEY
 from config import S3_STUDENTS_BUCKET, S3_GRADING_BUCKET
@@ -119,7 +120,7 @@ class Grader(Rankmaniac):
         sols = []
         with open(os.path.join('sols', self._infile), 'r') as f:
             for line in f:
-                sols.append(int(line.split('\t')[1]))
+                sols.append(int(line.strip()))
 
         # Retrieves the student rankings from Amazon S3
         i = self._last_process_step_iter_no
