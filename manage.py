@@ -13,8 +13,9 @@ from time import gmtime, strftime, sleep
 
 from boto.exception import EmrResponseError
 
-from config import TEAMS, DATASETS
+from config import TEAMS, DATASETS, SCORE_SESSION
 
+import scoreboard_client as scoreboard
 from grader import Grader
 
 assert len(DATASETS) >= 0
@@ -70,6 +71,7 @@ def handle_set(args):
     if args.key == 'infile':
         if args.value not in DATASETS:
             raise Exception('invalid dataset')
+        global infile
         infile = args.value
 
 def handle_run(args):
@@ -122,7 +124,7 @@ def handle_run(args):
             job_id = len(jobs) - 1
             job_ids_by_team_id[team_id] = job_id
         else:
-            # TODO: record lack of submission on scoreboard
+            scoreboard.record_no_submission(team_id, SCORE_SESSION)
             print('')
             print('Team %s had no submission to run.' % (team_id))
     print('')
@@ -233,8 +235,12 @@ def handle_grade(args):
                             team_ids.pop(i) # remove, since graded
                             did_pop = True
                             num_finished += 1
-                            # TODO: record execution time and penalty on
-                            #       scoreboard
+                            runtime = job.compute_job_time()
+                            penalty = job.compute_penalty()
+                            scoreboard.record_submission_time(team_id,
+                                                              runtime,
+                                                              penalty,
+                                                              SCORE_SESSION)
                             print('')
                             print('Team %s successfully wrote '
                                   "'FinalRank'." % (team_id))
@@ -245,8 +251,8 @@ def handle_grade(args):
                             team_ids.pop(i) # remove, since graded
                             did_pop = True
                             num_finished += 1
-                            # TODO: record failed submission on
-                            #       scoreboard
+                            scoreboard.record_invalid_submission(team_id,
+                                                                 SCORE_SESSION)
                             print('')
                             print('Team %s failed to write '
                                   "'FinalRank'." % (team_id))
