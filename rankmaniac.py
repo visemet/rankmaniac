@@ -297,14 +297,17 @@ class Rankmaniac:
         bucket = self._s3_conn.get_bucket(self._s3_bucket)
         keys = bucket.list(prefix='%s/' % (self.team_id))
         for key in keys:
-            suffix = key.name.split('/')[1:] # removes team identifier
-            filename = os.path.join(outdir, *suffix)
-            dirname = os.path.dirname(filename)
+            keyname = key.name
+            # Ignore folder keys
+            if '$' not in keyname:
+                suffix = keyname.split('/')[1:] # removes team identifier
+                filename = os.path.join(outdir, *suffix)
+                dirname = os.path.dirname(filename)
 
-            if not os.path.exists(dirname):
-                os.makedirs(dirname)
+                if not os.path.exists(dirname):
+                    os.makedirs(dirname)
 
-            key.get_contents_to_filename(filename)
+                key.get_contents_to_filename(filename)
 
     def describe(self):
         """
