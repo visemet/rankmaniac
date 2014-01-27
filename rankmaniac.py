@@ -141,13 +141,13 @@ class Rankmaniac:
         bucket = self._s3_conn.get_bucket(self._s3_bucket)
 
         # Clear out current bucket contents for team
-        keys = bucket.list(prefix='%s/' % (self.team_id))
+        keys = bucket.list(prefix=self._get_keyname())
         bucket.delete_keys(keys)
 
         for filename in os.listdir(indir):
             relpath = os.path.join(indir, filename)
             if os.path.isfile(relpath):
-                keyname = '%s/%s' % (self.team_id, filename)
+                keyname = self._get_keyname(filename)
                 key = bucket.new_key(keyname)
                 key.set_contents_from_filename(relpath)
 
@@ -237,7 +237,7 @@ class Rankmaniac:
             i = self._last_process_step_iter_no
 
             outdir = self._get_default_outdir('process', iter_no=i)
-            keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
+            keyname = self._get_keyname(outdir, 'part-00000')
 
             bucket = self._s3_conn.get_bucket(self._s3_bucket)
             key = Key(bucket=bucket, name=keyname)
@@ -295,7 +295,7 @@ class Rankmaniac:
         """
 
         bucket = self._s3_conn.get_bucket(self._s3_bucket)
-        keys = bucket.list(prefix='%s/' % (self.team_id))
+        keys = bucket.list(prefix=self._get_keyname())
         for key in keys:
             keyname = key.name
             # Ignore folder keys
@@ -403,7 +403,7 @@ class Rankmaniac:
         bucket = self._s3_conn.get_bucket(self._s3_bucket)
 
         # Clear out current bucket/output contents for team
-        keys = bucket.list(prefix='%s/%s' % (self.team_id, output))
+        keys = bucket.list(prefix=self._get_keyname(output))
         bucket.delete_keys(keys)
 
         step_name = self._make_name()
@@ -420,6 +420,19 @@ class Rankmaniac:
     def _make_name(self):
         return strftime('%%s %m-%d-%Y %H:%M:%S', localtime()) % (self.team_id)
 
+    def _get_keyname(self, *args):
+        """
+        Returns the key name to use in the grading bucket (for the
+        particular team).
+
+            'team_id/...'
+        """
+
+        return '%s/%s' % (self.team_id, '/'.join(args))
+
     def _get_s3_team_uri(self, *args):
-        return 's3n://%s/%s/%s' % (self._s3_bucket, self.team_id,
-                                   '/'.join(args))
+        """
+        Returns the Amazon S3 URI for the team submissions.
+        """
+
+        return 's3n://%s/%s' % (self._s3_bucket, self._get_keyname(*args))

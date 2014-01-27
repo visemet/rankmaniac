@@ -70,7 +70,7 @@ class Grader(Rankmaniac):
                 bucket = self._s3_conn.get_bucket(S3_GRADING_BUCKET)
                 relpath = os.path.join('data', self._infile)
                 if os.path.isfile(relpath): # also checks if file exists
-                    keyname = '%s/%s' % (self.team_id, self._infile)
+                    keyname = self._get_keyname(self._infile)
                     key = bucket.new_key(keyname)
                     key.set_contents_from_filename(relpath)
 
@@ -125,7 +125,7 @@ class Grader(Rankmaniac):
         # Retrieves the student rankings from Amazon S3
         i = self._last_process_step_iter_no
         outdir = self._get_default_outdir('process', iter_no=i)
-        keyname = '%s/%s/%s' % (self.team_id, outdir, 'part-00000')
+        keyname = self._get_keyname(outdir, 'part-00000')
 
         bucket = self._s3_conn.get_bucket(S3_GRADING_BUCKET)
         key = Key(bucket=bucket, name=keyname)
@@ -161,7 +161,7 @@ class Grader(Rankmaniac):
         dest_bucket = self._s3_conn.get_bucket(dest_bucket_name)
 
         # Clear out grading bucket/output contents for team
-        keys = dest_bucket.list(prefix='%s/' % (self.team_id))
+        keys = dest_bucket.list(prefix=self._get_keyname())
         dest_bucket.delete_keys(keys)
 
         keys = source_bucket.list(prefix='%s/' % (self.team_id))
@@ -169,7 +169,7 @@ class Grader(Rankmaniac):
             keyname = key.name
             suffix = keyname.split('/', 1)[1] # removes team identifier
             if '/' not in suffix and '$' not in suffix:
-                key.copy(dest_bucket, keyname)
+                key.copy(dest_bucket, self._get_keyname(suffix))
                 num_keys += 1
 
         # Return whether anything was copied, i.e. previously submitted
@@ -181,8 +181,8 @@ class Grader(Rankmaniac):
         `True` if the key was downloaded, and `False` otherwise.
         """
 
-        bucket = self._s3_conn.get_bucket(self._s3_bucket)
-        keyname = '%s/rankmaniac.cfg' % (self.team_id)
+        bucket = self._s3_conn.get_bucket(S3_GRADING_BUCKET)
+        keyname = self._get_keyname('rankmaniac.cfg')
         key = bucket.get_key(keyname)
 
         if key is not None:
@@ -220,3 +220,15 @@ class Grader(Rankmaniac):
             i += 1
 
         return times
+
+    def _get_keyname(self, *args):
+        """
+        (override method)
+
+        Returns the key name to use in the grading bucket (for the
+        particular team and dataset).
+
+            'team_id/infile/...'
+        """
+
+        return '%s/%s/%s' % (self.team_id, self._infile, '/'.join(args))
