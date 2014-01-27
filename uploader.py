@@ -20,6 +20,8 @@ from time import sleep
 from boto.exception import EmrResponseError
 from rankmaniac import Rankmaniac
 
+unbuff_stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # unbuffered
+
 def do_main(team_id, access_key, secret_key,
             infile='input.txt', max_iter=50):
     """
@@ -56,7 +58,7 @@ def do_main(team_id, access_key, secret_key,
         for i in range(max_iter):
             while True:
                 try:
-                    sys.stdout.write('.')
+                    unbuff_stdout.write('.')
                     r.do_iter(pagerank_map, pagerank_reduce,
                               process_map, process_reduce)
                     break
@@ -68,7 +70,7 @@ def do_main(team_id, access_key, secret_key,
         print('  Use Ctrl-C to interrupt')
         while True:
             try:
-                sys.stdout.write('.')
+                unbuff_stdout.write('.')
                 if r.is_done():
                     break
                 elif not r.is_alive():
