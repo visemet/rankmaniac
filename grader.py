@@ -55,6 +55,10 @@ class Grader(Rankmaniac):
         made!
         """
 
+        # Default number of map and reduce tasks to execute
+        num_mappers = 1
+        num_reducers = 1
+
         # Default modules for where to expect the pagerank step
         # and process step code
         pagerank_map = 'pagerank_map.py'
@@ -80,6 +84,8 @@ class Grader(Rankmaniac):
 
                 section = 'Rankmaniac'
                 if config.has_section(section):
+                    num_mappers = config.getint(section, 'num_mappers')
+                    num_reducers = config.getint(section, 'num_reducers')
                     pagerank_map = config.get(section, 'pagerank_map')
                     pagerank_reduce = config.get(section, 'pagerank_reduce')
                     process_map = config.get(section, 'process_map')
@@ -89,7 +95,9 @@ class Grader(Rankmaniac):
                     while True:
                         try:
                             self.do_iter(pagerank_map, pagerank_reduce,
-                                         process_map, process_reduce)
+                                         process_map, process_reduce,
+                                         num_pagerank_mappers=num_mappers,
+                                         num_pagerank_reducers=num_reducers)
                             break
                         except EmrResponseError:
                             sleep(10) # call Amazon APIs infrequently
