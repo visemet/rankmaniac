@@ -152,6 +152,7 @@ def handle_kill(args):
     job.terminate() # force terminate to be called
     jobs[job_id] = None
     del job # clean up the rest
+    del job_ids_by_team_id[team_id]
 
 def handle_time(args):
     """
