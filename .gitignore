@@ -36,4 +36,6 @@ nosetests.xml
 .pydevproject
 
 # Certain directories
+local_test_data
 results
+sols
