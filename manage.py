@@ -18,7 +18,15 @@ from config import TEAMS, DATASETS, SCORE_SESSION
 import scoreboard_client as scoreboard
 from grader import Grader
 
-assert len(DATASETS) >= 0
+####
+## Assumptions
+####
+assert len(DATASETS) >= 0, 'need at least one dataset'
+for dataset in DATASETS:
+    if not os.path.isfile(os.path.join('data', dataset)):
+        raise Exception('missing dataset %s' % (dataset))
+    elif not os.path.isfile(os.path.join('sols', dataset)):
+        raise Exception('missing solution for %s dataset' % (dataset))
 
 unbuff_stdout = os.fdopen(sys.stdout.fileno(), 'w', 0) # unbuffered
 
