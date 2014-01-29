@@ -13,7 +13,7 @@ Authored by: Max Hirschhorn (maxh@caltech.edu)
 
 from __future__ import with_statement # for Python 2.5
 
-import sys
+import sys, os
 import ConfigParser
 from time import sleep
 
@@ -28,6 +28,10 @@ def do_main(team_id, access_key, secret_key,
     Submits a new map-reduce job to Amazon EMR and waits for it to
     finish executing.
     """
+
+    # Ensure that the input file exists
+    if not os.path.isfile(os.path.join('data', infile)):
+        raise Exception('file %s not found' % (infile))
 
     # Default modules for where to expect the pagerank step
     # and process step code
