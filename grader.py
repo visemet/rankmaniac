@@ -115,7 +115,7 @@ class Grader(Rankmaniac):
 
         return sum(self._compute_step_times())
 
-    def compute_penalty(self, multiplier=30, num_rank=20):
+    def compute_penalty(self, multiplier=30, num_rank=20, max_diff=1000):
         """
         Returns the amount of time, in seconds, to be added to the
         execution time as penalty for inaccuracy of results.
@@ -130,6 +130,16 @@ class Grader(Rankmaniac):
             for line in f:
                 sols.append(int(line.strip()))
 
+        assert len(sols) >= num_rank, (
+            'must have at least top %d nodes in solution for %s dataset'
+            % (num_rank, self._infile)
+        )
+
+        assert len(sols) <= max_diff, (
+            'should have at most top %d nodes in solution for %s dataset'
+            % (max_diff, self._infile)
+        )
+
         # Retrieves the student rankings from Amazon S3
         i = self._last_process_step_iter_no
         outdir = self._get_default_outdir('process', iter_no=i)
@@ -141,11 +151,10 @@ class Grader(Rankmaniac):
 
         # Pad the list with enough values to make sure there are at
         # least num_rank nodes listed
-        ranks = [-1] * num_rank
+        ranks = [-1] * num_rank # -1 is not a real node identifier
         for index, line in enumerate(contents.splitlines()):
             ranks.insert(index, int(line.split('\t')[1]))
 
-        omitted = 0
         sum_sq_diff = 0
         for (actual, node) in enumerate(ranks[:num_rank]):
             try:
@@ -155,13 +164,10 @@ class Grader(Rankmaniac):
             # Note that no exception occurs assuming that the solution
             # contains the ranking for all of the nodes
             except ValueError:
-                # "Double" penalty here because we do not check
-                # the rankings past num_rank
-                sum_sq_diff += 2 * (actual - num_rank - omitted) ** 2
-                # Increment omitted so that missing nodes (not included
-                # in the top rank, i.e. not a simple permutation) are
-                # assumed to have been given rank X, X+1, ...
-                omitted += 1
+                # However, if an exception does occur due to malformed
+                # or lame input from the submission, then we apply
+                # a large (enough) penalty
+                sum_sq_diff += max_diff ** 2
 
         return multiplier * sum_sq_diff
 
