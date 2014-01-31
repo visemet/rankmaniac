@@ -22,4 +22,4 @@ long_names = {'foo': 'long foo team name',
 TEAMS = tuple(long_names.keys())
 
 # Datasets
-DATASETS = ('CaltechWeb', 'GNPn100p05')
+DATASETS = ('EmailEnron', 'GNPn100p05')
