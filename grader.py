@@ -115,7 +115,7 @@ class Grader(Rankmaniac):
 
         return sum(self._compute_step_times())
 
-    def compute_penalty(self, multiplier=30, num_rank=10):
+    def compute_penalty(self, multiplier=30, num_rank=20):
         """
         Returns the amount of time, in seconds, to be added to the
         execution time as penalty for inaccuracy of results.
@@ -145,15 +145,23 @@ class Grader(Rankmaniac):
         for index, line in enumerate(contents.splitlines()):
             ranks.insert(index, int(line.split('\t')[1]))
 
+        omitted = 0
         sum_sq_diff = 0
         for (actual, node) in enumerate(ranks[:num_rank]):
             try:
                 expected = sols.index(node)
                 sum_sq_diff += (actual - expected) ** 2
+
+            # Note that no exception occurs assuming that the solution
+            # contains the ranking for all of the nodes
             except ValueError:
                 # "Double" penalty here because we do not check
                 # the rankings past num_rank
-                sum_sq_diff += 2 * (actual - num_rank) ** 2
+                sum_sq_diff += 2 * (actual - num_rank - omitted) ** 2
+                # Increment omitted so that missing nodes (not included
+                # in the top rank, i.e. not a simple permutation) are
+                # assumed to have been given rank X, X+1, ...
+                omitted += 1
 
         return multiplier * sum_sq_diff
 
