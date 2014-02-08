@@ -157,6 +157,7 @@ def handle_kill(args):
     if job is None:
         raise Exception('job already terminated')
 
+    team_id = job.team_id
     job.terminate() # force terminate to be called
     jobs[job_id] = None
     del job # clean up the rest
