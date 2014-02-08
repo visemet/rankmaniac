@@ -121,7 +121,7 @@ class Grader(Rankmaniac):
         execution time as penalty for inaccuracy of results.
         """
 
-        if not self.is_done():
+        if not self.is_done() and self.is_alive():
             return None # not finished yet, so penalty undefined
 
         # Loads the solutions from the local directory

@@ -47,12 +47,24 @@ def handle_list(args):
 
     # display the state of each job
     elif args.key == 'jobs':
-        for i, r in enumerate(jobs):
-            if r is not None:
+        for i, job in enumerate(jobs):
+            if job is not None:
                 while True:
                     try:
-                        state = r.describe().state
-                        print('[%d]  %15s  %s' % (i, state, r.job_id))
+                        state = job.describe().state
+
+                        runtime = job.compute_job_time()
+                        penalty = job.compute_penalty()
+
+                        str_runtime = strftime('%H:%M:%S', gmtime(runtime))
+                        str_penalty = ''
+
+                        if penalty is not None:
+                            str_penalty = strftime('+%H:%M:%S', gmtime(penalty))
+
+                        print('[%02d]  %15s  %15s  %15s  (%s%s)'
+                              % (i, job.job_id, state, job.team_id,
+                                 str_runtime, str_penalty))
                         break
                     except EmrResponseError:
                         sleep(10) # call Amazon APIs infrequently
