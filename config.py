@@ -19,7 +19,8 @@ SCORE_SESSION = 0
 long_names = {'foo': 'long foo team name',
               'bar': 'long bar team name',
               'baz': 'long baz team name'}
-TEAMS = tuple(long_names.keys())
+
+TEAMS = tuple(sorted(long_names.keys()))
 
 # Datasets
 DATASETS = ('EmailEnron', 'GNPn100p05')
