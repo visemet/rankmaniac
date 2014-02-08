@@ -225,55 +225,49 @@ def handle_grade(args):
     print('Waiting for map-reduce job to finish...')
     print('  Use Ctrl-C to interrupt')
     # Do a second pass to wait on all map-reduce jobs
-    num_finished = 0
-    num_team_ids = len(team_ids)
     try:
-        while num_finished < num_team_ids:
-            i = 0
-            while i < len(team_ids): # length is NOT constant
-                team_id = team_ids[i]
-                did_pop = False
-                while True:
-                    try:
-                        unbuff_stdout.write('.')
-                        job_id = job_ids_by_team_id[team_id]
-                        job = jobs[job_id]
+        i = 0
+        while len(team_ids) > 0:
+            team_id = team_ids[i]
+            try:
+                unbuff_stdout.write('.')
+                job_id = job_ids_by_team_id[team_id]
+                job = jobs[job_id]
 
-                        # Check if job is done
-                        if job.is_done():
-                            team_ids.pop(i) # remove, since graded
-                            did_pop = True
-                            num_finished += 1
-                            runtime = job.compute_job_time()
-                            penalty = job.compute_penalty()
-                            scoreboard.record_submission_time(team_id,
-                                                              runtime,
-                                                              penalty,
-                                                              SCORE_SESSION)
-                            print('')
-                            print('Team %s successfully wrote '
-                                  "'FinalRank'." % (team_id))
-                            break
+                # Check if job is done
+                if job.is_done():
+                    team_ids.pop(i) # remove, since graded
+                    runtime = job.compute_job_time()
+                    penalty = job.compute_penalty()
+                    scoreboard.record_submission_time(team_id, runtime, penalty,
+                                                      SCORE_SESSION)
+                    print('')
+                    print("Team %s successfully wrote 'FinalRank'." % (team_id))
+                    continue
 
-                        # Otherwise, check if job has finished
-                        elif not job.is_alive():
-                            team_ids.pop(i) # remove, since graded
-                            did_pop = True
-                            num_finished += 1
-                            scoreboard.record_invalid_submission(team_id,
-                                                                 SCORE_SESSION)
-                            print('')
-                            print('Team %s failed to write '
-                                  "'FinalRank'." % (team_id))
-                            break
+                # ...or if job has finished
+                elif not job.is_alive():
+                    team_ids.pop(i) # remove, since graded
+                    scoreboard.record_invalid_submission(team_id, SCORE_SESSION)
+                    print('')
+                    print("Team %s failed to write 'FinalRank'." % (team_id))
+                    continue
 
-                        sleep(20) # call Amazon APIs infrequently
-                    except EmrResponseError:
-                        sleep(60) # call Amazon APIs infrequently
+                # Otherwise, check next team
+                i += 1
+                i %= len(team_ids)
 
-                # Only increment if did not pop() from the list
-                if not did_pop:
-                    i += 1
+                sleep(20) # call Amazon APIs infrequently
+            except EmrResponseError:
+                sleep(60) # call Amazon APIs infrequently
+
+            # Swallow any exceptions, and skip team
+            except Exception as e:
+                team_ids.pop(i) # remove, since graded
+                scoreboard.record_invalid_submission(team_id, SCORE_SESSION)
+                print('')
+                print('Team %s generated an exception.' % (team_id))
+                print('ERROR! %s' % (e))
     except KeyboardInterrupt:
         print('')
 
