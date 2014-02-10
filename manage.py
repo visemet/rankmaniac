@@ -47,28 +47,45 @@ def handle_list(args):
 
     # display the state of each job
     elif args.key == 'jobs':
+        jobdescs = [None] * len(jobs)
+        while True:
+            valid_jobs_idx = -1
+            jobs_idx_by_job_ids_idx = {}
+            job_ids = []
+            for i, job in enumerate(jobs):
+                if job is not None:
+                    valid_jobs_idx = i
+                    jobs_idx_by_job_ids_idx[len(job_ids)] = i
+                    job_ids.append(job.job_id)
+
+            try:
+                if valid_jobs_idx >= 0:
+                    emr_conn = jobs[valid_jobs_idx]._emr_conn
+                    res = emr_conn.describe_jobflows(jobflow_ids=job_ids)
+                    for i, value in enumerate(res):
+                        job_idx = jobs_idx_by_job_ids_idx[i]
+                        jobdescs[job_idx] = value
+                break
+            except EmrResponseError:
+                sleep(10) # call Amazon APIs infrequently
+
         for i, job in enumerate(jobs):
-            if job is not None:
-                while True:
-                    try:
-                        jobdesc = job.describe()
-                        state = jobdesc.state
+            jobdesc = jobdescs[i]
+            if jobdesc is not None:
+                state = jobdesc.state
 
-                        runtime = job.compute_job_time(jobdesc=jobdesc)
-                        penalty = job.compute_penalty(jobdesc=jobdesc)
+                runtime = job.compute_job_time(jobdesc=jobdesc)
+                penalty = job.compute_penalty(jobdesc=jobdesc)
 
-                        str_runtime = strftime('%H:%M:%S', gmtime(runtime))
-                        str_penalty = ''
+                str_runtime = strftime('%H:%M:%S', gmtime(runtime))
+                str_penalty = ''
 
-                        if penalty is not None:
-                            str_penalty = strftime('+%H:%M:%S', gmtime(penalty))
+                if penalty is not None:
+                    str_penalty = strftime('+%H:%M:%S', gmtime(penalty))
 
-                        print('[%02d]  %15s  %15s  %15s  (%s%s)'
-                              % (i, job.job_id, state, job.team_id,
-                                 str_runtime, str_penalty))
-                        break
-                    except EmrResponseError:
-                        sleep(10) # call Amazon APIs infrequently
+                print('[%02d]  %15s  %15s  %15s  (%s%s)'
+                      % (i, job.job_id, state, job.team_id,
+                         str_runtime, str_penalty))
 
     # display the filename of all available datasets
     elif args.key == 'datasets':
