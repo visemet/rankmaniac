@@ -91,16 +91,16 @@ class Grader(Rankmaniac):
                     process_map = config.get(section, 'process_map')
                     process_reduce = config.get(section, 'process_reduce')
 
-                for i in range(self._max_iter):
-                    while True:
-                        try:
-                            self.do_iter(pagerank_map, pagerank_reduce,
-                                         process_map, process_reduce,
-                                         num_pagerank_mappers=num_mappers,
-                                         num_pagerank_reducers=num_reducers)
-                            break
-                        except EmrResponseError:
-                            sleep(10) # call Amazon APIs infrequently
+                while True:
+                    try:
+                        self.do_niter(self._max_iter,
+                                      pagerank_map, pagerank_reduce,
+                                      process_map, process_reduce,
+                                      num_pagerank_mappers=num_mappers,
+                                      num_pagerank_reducers=num_reducers)
+                        break
+                    except EmrResponseError:
+                        sleep(10) # call Amazon APIs infrequently
 
                 os.remove(filename)
                 return True
