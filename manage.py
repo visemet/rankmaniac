@@ -363,14 +363,25 @@ if __name__ == '__main__':
                               help='swallow exceptions')
     parser_grade.set_defaults(func=handle_grade)
 
+    # Refer to http://stackoverflow.com/questions/5868506
+    try:
+        input = raw_input
+    except NameError:
+        pass
+
+    num_intr = 0
     while True:
         try:
-            line = raw_input('rankmaniac> ')
+            line = input('rankmaniac> ')
+            num_intr = 0 # reset counter of keyboard interrupts
             args = parser.parse_args(line.split())
             args.func(args)
         except KeyboardInterrupt:
             print('')
-            break
+            if num_intr > 0:
+                break
+            num_intr += 1
+            print('Press Ctrl-C again to exit')
         except Exception as e:
             print('ERROR! %s' % (e))
         except:
