@@ -149,6 +149,10 @@ class Grader(Rankmaniac):
             % (max_diff, self._infile)
         )
 
+        ranks_by_node = {}
+        for i, node in enumerate(sols):
+            ranks_by_node[node] = i
+
         # Retrieves the student rankings from Amazon S3
         i = self._last_process_step_iter_no
         outdir = self._get_default_outdir('process', iter_no=i)
@@ -170,12 +174,12 @@ class Grader(Rankmaniac):
         sum_sq_diff = 0
         for (actual, node) in enumerate(ranks[:num_rank]):
             try:
-                expected = sols.index(node)
+                expected = ranks_by_node[node]
                 sum_sq_diff += (actual - expected) ** 2
 
             # Note that no exception occurs assuming that the solution
             # contains the ranking for all of the nodes
-            except ValueError:
+            except KeyError:
                 # However, if an exception does occur due to malformed
                 # or lame input from the submission, then we apply
                 # a large (enough) penalty
