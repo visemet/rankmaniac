@@ -107,21 +107,33 @@ class Grader(Rankmaniac):
 
         return False # signal set-up has failed
 
-    def compute_job_time(self):
+    def compute_job_time(self, jobdesc=None):
         """
         Returns the sum of the amount of time, in seconds, each step of
         the map-reduce job took.
+
+        Keyword arguments:
+            jobdesc     <boto.emr.JobFlow>      cached description of
+                                                jobflow to use
         """
 
-        return sum(self._compute_step_times())
+        return sum(self._compute_step_times(jobdesc=jobdesc))
 
-    def compute_penalty(self, multiplier=30, num_rank=20, max_diff=1000):
+    def compute_penalty(self, multiplier=30, num_rank=20, max_diff=1000,
+                        jobdesc=None):
         """
         Returns the amount of time, in seconds, to be added to the
         execution time as penalty for inaccuracy of results.
+
+        Keyword arguments:
+            jobdesc     <boto.emr.JobFlow>      cached description of
+                                                jobflow to use
         """
 
-        if not self.is_done() and self.is_alive():
+        if jobdesc is None:
+            jobdesc = self.describe()
+
+        if not self.is_done(jobdesc=jobdesc) and self.is_alive(jobdesc=jobdesc):
             return None # not finished yet, so penalty undefined
 
         # Loads the solutions from the local directory
@@ -213,20 +225,28 @@ class Grader(Rankmaniac):
 
         return False # signal key did not exist
 
-    def _compute_step_times(self):
+    def _compute_step_times(self, jobdesc=None):
         """
         Returns the amount of time, in seconds, each step of the
         map-reduce job took as a list.
+
+        Keyword arguments:
+            jobdesc     <boto.emr.JobFlow>      cached description of
+                                                jobflow to use
         """
 
-        self.is_done()
+        if jobdesc is None:
+            self.jobdesc = self.describe()
+
+        self.is_done(jobdesc=jobdesc) # make sure that last process step
+                                      # iteration number is up to date
 
         max_step = 0
         if self._last_process_step_iter_no >= 0:
             max_step = 2 * self._last_process_step_iter_no + 1
 
         times = []
-        steps = self.describe().steps
+        steps = jobdesc.steps
 
         i = 0
         while i <= max_step:

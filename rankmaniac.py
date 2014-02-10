@@ -208,7 +208,7 @@ class Rankmaniac:
         self._last_outdir = process_output
         self._iter_no += 1
 
-    def is_done(self):
+    def is_done(self, jobdesc=None):
         """
         Returns `True` if the map-reduce job is done, and `False`
         otherwise.
@@ -216,6 +216,10 @@ class Rankmaniac:
         For all process-step output files that have not been fetched,
         gets the first part of the output file, and checks whether its
         contents begins with the string 'FinalRank'.
+
+        Keyword arguments:
+            jobdesc     <boto.emr.JobFlow>      cached description of
+                                                jobflow to use
 
         Special notes:
             WARNING! The usage of this method in your code requires that
@@ -228,7 +232,7 @@ class Rankmaniac:
         if self._is_done:
             return True
 
-        iter_no = self._get_last_process_step_iter_no()
+        iter_no = self._get_last_process_step_iter_no(jobdesc=jobdesc)
         if iter_no < 0:
             return False
 
@@ -249,10 +253,14 @@ class Rankmaniac:
 
         return self._is_done
 
-    def is_alive(self):
+    def is_alive(self, jobdesc=None):
         """
         Checks whether the jobflow has completed, failed, or been
         terminated.
+
+        Keyword arguments:
+            jobdesc     <boto.emr.JobFlow>      cached description of
+                                                jobflow to use
 
         Special notes:
             WARNING! This method should only be called **after**
@@ -261,8 +269,10 @@ class Rankmaniac:
             on its final iteration and has a 'COMPLETED' state.
         """
 
-        jobflow = self.describe()
-        if jobflow.state in ('COMPLETED', 'FAILED', 'TERMINATED'):
+        if jobdesc is None:
+            jobdesc = self.describe()
+
+        if jobdesc.state in ('COMPLETED', 'FAILED', 'TERMINATED'):
             return False
 
         return True
@@ -347,13 +357,20 @@ class Rankmaniac:
 
         return self._emr_conn.describe_jobflow(self.job_id)
 
-    def _get_last_process_step_iter_no(self):
+    def _get_last_process_step_iter_no(self, jobdesc=None):
         """
         Returns the most recently process-step of the job flow that has
         been completed.
+
+        Keyword arguments:
+            jobdesc     <boto.emr.JobFlow>      cached description of
+                                                jobflow to use
         """
 
-        steps = self.describe().steps
+        if jobdesc is None:
+            jobdesc = self.describe()
+
+        steps = jobdesc.steps
         i = 1
 
         while i < len(steps):
