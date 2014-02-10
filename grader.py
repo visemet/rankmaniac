@@ -130,10 +130,7 @@ class Grader(Rankmaniac):
                                                 jobflow to use
         """
 
-        if jobdesc is None:
-            jobdesc = self.describe()
-
-        if not self.is_done(jobdesc=jobdesc) and self.is_alive(jobdesc=jobdesc):
+        if not self.is_done(jobdesc=jobdesc):
             return None # not finished yet, so penalty undefined
 
         # Loads the solutions from the local directory
@@ -236,7 +233,7 @@ class Grader(Rankmaniac):
         """
 
         if jobdesc is None:
-            self.jobdesc = self.describe()
+            jobdesc = self.describe()
 
         self.is_done(jobdesc=jobdesc) # make sure that last process step
                                       # iteration number is up to date
