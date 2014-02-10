@@ -155,8 +155,11 @@ class Grader(Rankmaniac):
         keyname = self._get_keyname(outdir, 'part-00000')
 
         bucket = self._s3_conn.get_bucket(S3_GRADING_BUCKET)
-        key = Key(bucket=bucket, name=keyname)
-        contents = key.get_contents_as_string()
+        key = bucket.get_key(keyname)
+        contents = ''
+
+        if key is not None:
+            contents = key.get_contents_as_string()
 
         # Pad the list with enough values to make sure there are at
         # least num_rank nodes listed

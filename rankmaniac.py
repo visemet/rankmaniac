@@ -236,20 +236,25 @@ class Rankmaniac:
         if iter_no < 0:
             return False
 
-        while self._last_process_step_iter_no < iter_no:
-            self._last_process_step_iter_no += 1
-            i = self._last_process_step_iter_no
+        i = self._last_process_step_iter_no
+        while i < iter_no:
+            i += 1
 
             outdir = self._get_default_outdir('process', iter_no=i)
             keyname = self._get_keyname(outdir, 'part-00000')
 
             bucket = self._s3_conn.get_bucket(self._s3_bucket)
-            key = Key(bucket=bucket, name=keyname)
-            contents = key.next() # get first chunk of the output file
+            key = bucket.get_key(keyname)
+            contents = ''
+
+            if key is not None:
+                contents = key.next() # get first chunk of the output file
 
             if contents.startswith('FinalRank'):
                 self._is_done = True # cache result
                 break
+
+        self._last_process_step_iter_no = i
 
         return self._is_done
 
